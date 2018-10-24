@@ -9,12 +9,12 @@ def _placeholder(dtype=tf.float32, shape=None, name=None):
     return tf.placeholder(dtype=dtype, shape=shape, name=name)
 
 class model(model_base):
-    def __init__(self, args, mode, sudoku_size, gpu_list=None):
-        super().__init__()
+    def __init__(self, args, mode, gpu_list=None):
+        super().__init__(args, gpu_list)
         self.mode = mode
         self.batch_size = args.batct_size if self.mode == "train" else args.eval_batch_size
-        self.sudoku_size = sudoku_size
         self.gpu_list = [item for item in gpu_list.split(',')]
+        self.args = args
 
     def _loss(self, logit, value, nxt_move, label, prob, regularizer):
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logit, labels=nxt_move)
