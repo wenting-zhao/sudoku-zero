@@ -8,7 +8,7 @@ import time
 from model import model
 
 class sudoku_model(model):
-    def __init__(self, args, mode, batch_size, gpu_list='0'):
+    def __init__(self, args, mode, gpu_list='0'):
         super().__init__(args, mode, gpu_list)
         self.args = args
 

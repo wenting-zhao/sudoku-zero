@@ -154,6 +154,9 @@ class model(model_base):
         print (format_str % (global_step, loss, sample_per_sec, sec_per_batch))
         sys.stdout.flush()
 
+    def get_step(self):
+        return self.sess.run(self.global_step)
+
     def get_all_var(self):
         return self.all_var
 
