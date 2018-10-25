@@ -33,6 +33,8 @@ class model(model_base):
         return cross_entropy_mean, v_loss, reg_term, v_loss + cross_entropy_mean + reg_term, kl_mean
 
     def _extract_feature(self, history):
+        # JUST FOR TEST:
+        return history
         # TODO:
         pass
 
