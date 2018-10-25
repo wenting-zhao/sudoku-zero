@@ -12,7 +12,9 @@ from multiprocessing import Process, current_process, Value, Lock
 from multiprocessing.queues import SimpleQueue
 from multiprocessing.managers import BaseManager
 
-from Queue import Queue
+from queue import Queue
+
+from model import model as M
 
 def meditation(random_state, gpu_id, queue, lock, verbose=True):
     cur_process = current_process()
@@ -21,6 +23,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
     board_size = args.board_size 
     module = importlib.import_moduel(args.type)
     model = module.sudoku_model(args, mode="predict", gpu_list=str(gpu_id))
+    #model = M(args, mode="predict", gpu_list=str(gpu_id))
     model.preprocess()
     model.build_model()
 
@@ -45,16 +48,16 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             # TODO: Collect the data
 
             # JUST FOR TEST: Random generate data for test
-            data = (np.random.random((9, 9, 10)), 2, 10)
+            data = (np.random.random((9, 9, 10), dtype=np.float32), 2.0, 10.0)
             queue.put(data)
             
-        except Exception, e:
+        except Exception as e:
             print (str(e))
 
 def slave():
     BaseManager.register("get_history_queue")
     print ("Connect to server %s:%d..." % (args.host, args.port))
-    manager = BaseManager(address=(args.host, args.port), authkey="miaomiaomiao")
+    manager = BaseManager(address=(args.host, args.port), authkey=bytes("miaomiaomiao", "utf-8"))
     manager.connect()
     queue = manager.get_history_queue()
 
@@ -82,7 +85,7 @@ def train(cluster):
     if cluster:
         queue = Queue(maxsize=128000)
         BaseManager.register("get_history_queue", callable=lambda: queue)
-        manager = BaseManager(address=("0.0.0.0", args.port), authkey="miaomiaomiao")
+        manager = BaseManager(address=("0.0.0.0", args.port), authkey=bytes("miaomiaomiao", "utf-8"))
         manager.start()
         print ("Listen at %d..." % (args.port))
 
@@ -99,6 +102,7 @@ def train(cluster):
 
     module = importlib.import_module(args.type)
     train_agent = module.sudoku_model(args, mode="train", gpu_list=args.train_gpu)
+    #train_agent = M(args, mode="train", gpu_list=args.train_gpu)
     train_agent.preprocess()
     train_agent.build_model()
     train_agent.load_model()
@@ -111,6 +115,9 @@ def train(cluster):
     while True:
         (history, nxt_move, label) = queue.get()
         if n_sample % 1000 == 0:
+            print (type(history))
+            print (type(nxt_move))
+            print (type(label))
             size = train_agent.push_sample(history, nxt_move, label, ret_size=True)
             print ("Num training sample=%d, tf queue size=%d" % (n_sample, size))
         else:
@@ -123,7 +130,10 @@ if __name__ == "__main__":
     argparser.add_argument("--type", type=str)
     argparser.add_argument("--model_path", type=str, default=None)
     argparser.add_argument("--gpu_list", type=str, default="0")
-    argparser.add_argument("--num_feature", type=int, default=9*9*10)
+    argparser.add_argument("--feature_num", type=int, default=10)
+    argparser.add_argument("--mode", type=str, default="miao")
+    argparser.add_argument("--lr", type=float, default=0.001)
+    argparser.add_argument("--l2", type=float, default=0.000001)
 
     argparser.add_argument("--port", type=int, default="12345")
     argparser.add_argument("--host", type=str, default="localhost")
@@ -132,6 +142,8 @@ if __name__ == "__main__":
     argparser.add_argument("--eval_batch_size", type=int, default=16)
 
     argparser.add_argument("--batch_size", type=int, default=128)
+    argparser.add_argument("--buffer_size", type=int, default=1000000)
+    argparser.add_argument("--min_buffer_size", type=int, default=10000)
     argparser.add_argument("--train_gpu", type=str, default='0')
     argparser.add_argument("--filename", type=str, default=None)
     argparser.add_argument("--regularizer", type=bool, default=True)

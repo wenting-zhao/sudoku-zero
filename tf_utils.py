@@ -29,7 +29,7 @@ def resnet_bn_block(x, n_channel, is_train, dev, scope=None, reuse=True, expand_
             x = shortcut + x
         return x
 
-def resnet_bn_block_preact(x, n_channel, is_train, dec, scope=None, reuse=Ture, decay=0.99, weights_regularizer=None, first_layer=False):
+def resnet_bn_block_preact(x, n_channel, is_train, dec, scope=None, reuse=True, decay=0.99, weights_regularizer=None, first_layer=False):
     with tf.variable_scope(scope):
         shortcut = x
         if not first_layer:

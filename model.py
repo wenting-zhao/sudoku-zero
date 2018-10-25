@@ -12,7 +12,7 @@ class model(model_base):
     def __init__(self, args, mode, gpu_list=None):
         super().__init__(args, gpu_list)
         self.mode = mode
-        self.batch_size = args.batct_size if self.mode == "train" else args.eval_batch_size
+        self.batch_size = args.batch_size if self.mode == "train" else args.eval_batch_size
         self.gpu_list = [item for item in gpu_list.split(',')]
         self.args = args
 
@@ -32,9 +32,43 @@ class model(model_base):
 
         return cross_entropy_mean, v_loss, reg_term, v_loss + cross_entropy_mean + reg_term, kl_mean
 
+    #def _forward(self, inputs, batch_size, is_train, device, reuse, regularizer=None, rot_var=None):
+    #        X, _ = inputs
+    #        n_filter=16
+    #        n_extra = 8
+
+    #        net = tf.contrib.layers.conv2d(X, n_filter, kernel_size=3, biases_initializer=None, activation_fn=None, scope="input", reuse=reuse, weights_regularizer=regularizer)
+    #        net = tfutils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet0")
+    #        net = tfutils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet1")
+    #        net = tfutils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet2")
+
+    #        net = tfutils.conv_bn_relu(net, n_filter, kernel_size=3, scope="reduce", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
+    #        
+    #        net = tfutils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet3")
+    #        net = tfutils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet4")
+    #        net = tfutils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet5")
+
+    #        # Value
+    #        value = tfutils.conv_bn_relu(net, 1, 1, scope="value0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regulrizer)
+    #        value = tf.contrib.layers.flatten(value)
+    #        value = tf.contrib.layers.fully_connected(value, 256, scope="value1", reuse=reuse, weights_regularizer=regularizer)
+    #        value = tf.contrib.layers.fully_connected(value, 1, activation_fn=tf.nn.relu, scope="value2", reuse=reuse, weights_regularizer=regularizer)
+    #        value = tf.squeeze(value, axis=1)
+
+    #        # Policy
+    #        policy = tfutils.conv_bn_relu(net, 2, 1, scope="policy0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
+    #        policy = tf.contrib.layers.flatten(policy)
+    #        logit = tf.conrib.layers.fully_connected(policy, self.args.board_size ** 2 + 1, scope="policy1", activation_fn=None, reuse=reuse, weights_regularizer=regularizer)
+    #        pred = tf.nn.softmax(logit)
+
+    #        value = tf.idnetity(value, "value_output")
+    #        pred = tf.identity(pred, "policy_output")
+
+    #        return logit, pred, value
+
     def _extract_feature(self, history):
         # JUST FOR TEST:
-        return history
+        return history, history
         # TODO:
         pass
 
@@ -42,15 +76,24 @@ class model(model_base):
         with self.graph.as_default():
             self.global_step = tf.Variable(0, name='steps', trainable=False)
             if self.mode == "train":
-                history = self.history
+                #history = self.history = _placeholder(tf.string, name="historys")
                 nxt_move = self.nxt_move = _placeholder(name="nxt_move")
                 label = self.label = _placeholder(name="label")
+                # TODO: write extract feature as a tfop 
+                #features, search_prob = self._extract_feature(history)
+                #features, search_prob = history, history
+                features = self.features = _placeholder(shape=[self.args.board_size, self.args.board_size, 10], name="features")
+                # TODO: remove search prob
+                search_prob = features
 
-                features, search_prob = _extract_feature(history)
+                self.sample_buffer = sample_buffer = tf.RandomShuffleQueue(capacity=self.args.buffer_size, min_after_dequeue=self.args.min_buffer_size, 
+                                                                            shapes=[[self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size ** 2 + 1], []], 
+                                                                            dtypes=[tf.float32, tf.float32, tf.float32, tf.float32])
+                print (type(features))
+                print (type(search_prob))
+                print (type(nxt_move))
+                print (type(label))
 
-                self.sample_buffer = sample_buffer = tf.RandomShuffleQueue(capacity=self.args.buffer_size, min_after_dequeue=self.min_buffer_size, 
-                                                                            shapes=[[self.args.board_size, self.args.board_size, self.feature_num], [self.args.board_size, self.args.board_size], [self.board_size ** 2 + 1], []], 
-                                                                            dtypes=[tf.float32, tf.int32, tf.float32, tf.float32])
                 self.feed_step = sample_buffer.enqueue((features, search_prob, nxt_move, label))
                 self.queue_size = sample_buffer.size()
             else:
@@ -59,8 +102,10 @@ class model(model_base):
                     pi = []
                     history = self.history = _placeholder(tf.string, name='history')
                     for i in range(self.batch_size):
-                        feature, search_prob = _extract_feature(history[i])
-                        X.append(feature)
+                        # TODO: write extract feature as a tfop 
+                        #feature, search_prob = _extract_feature(history[i])
+                        features, search_prob = history, history
+                        X.append(features)
                         pi.append(search_prob)
                     X = tf.reshape(X, [self.batch_size, self.args.board_size, self.args.board_size, self.args.feature_num], name="X")
                     pi = tf.reshape(pi, [self.batch_size, self.args.board_size, self.args.board_size, 1], name="pi")
@@ -69,12 +114,12 @@ class model(model_base):
                 self.pi = tf.reshpe(pi, [self.batch_size, self.args.board_size, self.args.board_size])
 
     def build_model(self):
-        board_size = tf.args.board_size
-        batch_size = tf.args.batch_size
-        with tf.graph.as_default():
-            if self.mode == "predice":
+        board_size = self.args.board_size
+        batch_size = self.args.batch_size
+        with self.graph.as_default():
+            if self.mode == "predict":
                 with tf.device('/gpu:%s' % self.gpu_list[0]):
-                    logit, _, value = self._forward([self.x, self.pi], batch_size, False, dev='tower0', reuse=None)
+                    logit, _, value = self._forward([self.x, self.pi], batch_size, False, device='tower0', reuse=None)
                     prob = tf.nn.softmax(logit)
                     self.prob = tf.identity(prob, "policy_output")
                     self.value = tf.identity(value, "value_output")
@@ -97,14 +142,15 @@ class model(model_base):
                 tower_prob  = []
 
                 for i, cur_gpu in enumerate(self.gpu_list):
+                    cur_gpu = int(cur_gpu)
                     with tf.device('/gpu:%d' % cur_gpu):
                         with tf.name_scope('tower_%d' % cur_gpu) as scope:
                             gpu_batch_size = batch_size / n_gpu # This should be diveded 
                             regularizer = tf.contrib.layers.l2_regularizer(self.args.l2)
-                            if cur_gpu == 0:
-                                logit, prob, v = self._forward([batch_X[i], batch_pi[i], gpu_batch_size, is_train=True, device="tower%d"%i, reuse=None, regularizer=regularizer)
+                            if i == 0:
+                                logit, prob, v = self._forward([batch_X[i], batch_pi[i]], gpu_batch_size, is_train=True, device="tower%d"%i, reuse=None, regularizer=regularizer)
                             else:
-                                logit, prob, v = self._forward([batch_X[i], batch_pi[i], gpu_batch_size, is_train=True, device="tower%d"%i, reuse=True, regularizer=regularizer)
+                                logit, prob, v = self._forward([batch_X[i], batch_pi[i]], gpu_batch_size, is_train=True, device="tower%d"%i, reuse=True, regularizer=regularizer)
 
                             tower_prob.append(prob)
                             ce, mse, reg, loss, kl = self._loss(logit, v, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
@@ -132,8 +178,8 @@ class model(model_base):
             self.saver = tf.train.Saver(tf.global_variablies(), max_to_keep=50)
             self.all_var = tf.global_variables()
 
-    def push_sample(self, hostory, nxt_move, label, get_cur_size=False):
-        feed = {self.history: history, self.nxt_move: nxt_move, self.label: label]
+    def push_sample(self, features, nxt_move, label, get_cur_size=False):
+        feed = {self.features: features, self.nxt_move: nxt_move, self.label: label}
         if get_cur_size:
             _, size = self.sess.run([self.feed_step, self.queue_size], feed_dict=feed)
             return size
