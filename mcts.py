@@ -1,5 +1,3 @@
-# code adapted from https://github.com/hildensia/mcts
-
 import random
 import numpy as np
 
@@ -10,11 +8,12 @@ class MCTS():
     tree policy, a default policy, and a backup strategy.
     See e.g. Browne et al. (2012) for a survey on monte carlo tree search
     """
-    def __init__(self, tree_policy, default_policy):
-        self.tree_policy = tree_policy
-        self.default_policy = default_policy
+    def __init__(self, sudoku_size, ucb1_confidence=1.41):
+        self.sudoku_size = sudoku_size
+        self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
+        self.ucb1_confidence = ucb1_confidence
 
-    def __call__(self, root, n=1500):
+    def __call__(self, root, sudoku_state, n=1500):
         """
         Run the monte carlo tree search.
 
@@ -22,41 +21,69 @@ class MCTS():
         :param n: The number of roll-outs to be performed
         :return:
         """
+
+        self.constraints = self._get_constraints(sudoku_state)
+        self.search_order = self._get_search_order()
+
         if root.parent is not None:
             raise ValueError("Root's parent must be None.")
 
         for _ in range(n):
             node = _get_next_node(root, self.tree_policy)
-            node.reward = self.default_policy(node)
+            node.score = self._roll_out(node)
             backup(node)
 
-        return rand_max(root.children.values(), key=lambda x: x.q).action
+        return _best_child(root)
 
     def _expand(state_node):
-        action = random.choice(state_node.untried_actions)
-        return state_node.children[action].sample_state()
+        return random.choice(state_node.untried_actions)
 
-    def _best_child(state_node, tree_policy):
-        best_action_node = utils.rand_max(state_node.children.values(),
-                                          key=tree_policy)
-        return best_action_node.sample_state()
+    def _best_child(state_node):
+        most_promising_node = 0
+        most_promising = 0
+        deepest_node = 0
+        deepest = 0
+        for child in state_node.children:
+            ucb1 = self.UCB1(child)
+            if ucb1 > most_promising:
+                most_promising = ucb1
+                most_promising_node = child
+            if child.depth > deepest:
+                deepest = child.depth
+                deepest_node = child
+            if most_promising_node.action != deepest_node.action:
+                print("deepest node isn't most promising node.")
+        return most_promising_node
 
-    def _get_next_node(state_node, tree_policy):
-        while not state_node.state.is_terminal():
+    def _get_next_node(state_node):
+        # TODO: next node is selected from the next fewest actions node
+        while len(state_node.children) != 0:
             if state_node.untried_actions:
                 return _expand(state_node)
             else:
-                state_node = _best_child(state_node, tree_policy)
+                state_node = _best_child(state_node)
         return state_node
 
-    def UCB1(action_node):
-        if self.c == 0:  # assert that no nan values are returned
-                        # for action_node.n = 0
-            return action_node.q
+    def _roll_out(state_node):
+        depth = 0
+        state = state_node.state
+        parent = state_node.parent.parent.state
+        action = state_node.parent.action
+        # TODO: in each iteration, need to add new constraints for two purposes:
+        #       1) know which node to choose next
+        #       2) know when to stop
+        #       3) when depth is n*n, then the search can stop because a solution has found
+        while len(state_node.children) != 0:
+            depth += 1
+            action = random.choice(state_node.state.actions)
+            parent = state
+            state = parent.perform(action)
 
-        return (action_node.q +
-                self.c * np.sqrt(2 * np.log(action_node.parent.n) /
-                                 action_node.n))
+        return reward
+
+    def UCB1(node):
+        return (node.score +
+                self.ucb1_confidence * np.sqrt(2 * np.log(node.parent.visited) / node.visited))
 
     def backup(node):
         """
@@ -65,227 +92,74 @@ class MCTS():
         See feldman amd Domshlak (2014) for reference.
         :param node: The node to start the backup from
         """
-        r = node.reward
+        r = node.score
         while node is not None:
-            node.n += 1
-            node.q = ((node.n - 1)/node.n) * node.q + 1/node.n * r
+            node.visited += 1
+            node.score = ((node.visited - 1)/node.visited) * node.score + 1/node.visited * r
             node = node.parent
+            # TODO: record best sequence
 
-    def immediate_reward(state_node):
-        """
-        Estimate the reward with the immediate return of that state.
-        :param state_node:
-        :return:
-        """
-        return state_node.state.reward(state_node.parent.parent.state,
-                                       state_node.parent.action)
+    def _get_constraints(self, sudoku):
+        sudoku = np.asarray(sudoku)
+        constraints = []
 
+        assert sudoku_size == sudoku.shape[0], sudoku_size == sudoku.shape[1]
 
-class RandomKStepRollOut():
-    """
-    Estimate the reward with the sum of returns of a k step rollout
-    """
-    def __init__(self, k):
-        self.k = k
+        # get row constraints, each element in the constraints list is also a list,
+        # representing which elements are still available for that row
+        for i in range(self.sudoku_size):
+            constraints.append(set(range(1,10)) - set(sudoku[i, :]))
 
-    def __call__(self, state_node):
-        self.current_k = 0
+        # column constraints
+        for i in range(self.sudoku_size):
+            constraints.append(set(range(1,10)) - set(sudoku[:, i]))
 
-        def stop_k_step(state):
-            self.current_k += 1
-            return self.current_k > self.k or state.is_terminal()
+        # box constraints
+        for key in self.box_group.keys():
+            box_number = set([sudoku[x, y] for (x, y) in self.box_group[key]])
+            constraints.append(set(range(1,10)) - set(box_number))
+        return constraints
 
-        return _roll_out(state_node, stop_k_step)
+    def _get_box_group(self, sudoku_size):
+        i = 0
+        sqrt_n = int(np.sqrt(sudoku_size))
+        for x in range(0, sudoku_size, sqrt_n):
+            for y in range(0, sudoku_size, sqrt_n):
+                box_group[i] = [(p, q) for p in range(x, x+sqrt_n) for q in range(y, y+sqrt_n)]
+                for z in box_group[i]:
+                    which_group[z] = i
+                i += 1
+        return box_group, which_group
 
-
-def random_terminal_roll_out(state_node):
-    """
-    Estimate the reward with the sum of a rollout till a terminal state.
-    Typical for terminal-only-reward situations such as games with no
-    evaluation of the board as reward.
-
-    :param state_node:
-    :return:
-    """
-    def stop_terminal(state):
-        return state.is_terminal()
-
-    return _roll_out(state_node, stop_terminal)
-
-
-def _roll_out(state_node, stopping_criterion):
-    reward = 0
-    state = state_node.state
-    parent = state_node.parent.parent.state
-    action = state_node.parent.action
-    while not stopping_criterion(state):
-        reward += state.reward(parent, action)
-
-        action = random.choice(state_node.state.actions)
-        parent = state
-        state = parent.perform(action)
-
-    return reward
+    def _get_search_order(self):
+        possible_values = dict()
+        for i in range(len(sudoku)):
+            for j in range(len(sudoku)):
+                possible_values[(i, j)] = len(constraints[i] & constraints[j+sudoku_size] & constraints[which_group[(i, j)]+2*sudoku_size])
+                return sorted(possible_values.items(), key=lambda kv: kv[1])
 
 
-def rand_max(iterable, key=None):
-    """
-    A max function that tie breaks randomly instead of first-wins as in
-    built-in max().
-    :param iterable: The container to take the max from
-    :param key: A function to compute tha max from. E.g.:
-      >>> rand_max([-2, 1], key=lambda x:x**2
-      -2
-      If key is None the identity is used.
-    :return: The entry of the iterable which has the maximum value. Tie
-    breaks are random.
-    """
-    if key is None:
-        key = lambda x: x
-
-    max_v = -np.inf
-    max_l = []
-
-    for item, value in zip(iterable, [key(i) for i in iterable]):
-        if value == max_v:
-            max_l.append(item)
-        elif value > max_v:
-            max_l = [item]
-            max_v = value
-
-    return random.choice(max_l)
-
-
-class Node(object):
-    def __init__(self, parent):
-        self.parent = parent
-        self.children = {}
-        self.q = 0
-        self.n = 0
-
-
-class ActionNode(Node):
-    """
-    A node holding an action in the tree.
-    """
-    def __init__(self, parent, action):
-        super(ActionNode, self).__init__(parent)
-        self.action = action
-        self.n = 0
-
-    def sample_state(self, real_world=False):
-        """
-        Samples a state from this action and adds it to the tree if the
-        state never occurred before.
-
-        :param real_world: If planning in belief states are used, this can
-        be set to True if a real world action is taken. The belief is than
-        used from the real world action instead from the belief state actions.
-        :return: The state node, which was sampled.
-        """
-        if real_world:
-            state = self.parent.state.real_world_perform(self.action)
-        else:
-            state = self.parent.state.perform(self.action)
-
-        if state not in self.children:
-            self.children[state] = StateNode(self, state)
-
-        if real_world:
-            self.children[state].state.belief = state.belief
-
-        return self.children[state]
-
-    def __str__(self):
-        return "Action: {}".format(self.action)
-
-
-class StateNode(Node):
+class Node(Node):
     """
     A node holding a state in the tree.
     """
-    def __init__(self, parent, state):
-        super(StateNode, self).__init__(parent)
-        self.state = state
-        self.reward = 0
-        for action in state.actions:
-            self.children[action] = ActionNode(self, action)
+    def __init__(self, parent, action, pos, sudoku_state):
+        self.parent = parent
+        self.children = {}
+        self.action = action  # a number from 1-9
+        self.best_sequence = []  # [(state_0, action_0), ..., (state_n, action_n)]
+        self.depth = len(best_sequence)
+        self.visited = 0
+        self.score = 0
+        self.pos = pos
+        # these are the constraints added during tree search in addition to the original constraints
+        self.additional_constraints = []
 
-    @property
+        # TODO: add children
+
     def untried_actions(self):
         """
         All actions which have never be performed
         :return: A list of the untried actions.
         """
-        return [a for a in self.children if self.children[a].n == 0]
-
-    @untried_actions.setter
-    def untried_actions(self, value):
-        raise ValueError("Untried actions can not be set.")
-
-    def __str__(self):
-        return "State: {}".format(self.state)
-
-
-def breadth_first_search(root, fnc=None):
-    """
-    A breadth first search (BFS) over the subtree starting from root. A
-    function can be run on all visited nodes. It gets the current visited
-    node and a data object, which it can update and should return it. This
-    data is returned by the function but never altered from the BFS itself.
-    :param root: The node to start the BFS from
-    :param fnc: The function to run on the nodes
-    :return: A data object, which can be altered from fnc.
-    """
-    data = None
-    queue = [root]
-    while queue:
-        node = queue.pop(0)
-        data = fnc(node, data)
-        for child in node.children.values():
-            queue.append(child)
-    return data
-
-
-def depth_first_search(root, fnc=None):
-    """
-    A depth first search (DFS) over the subtree starting from root. A
-    function can be run on all visited nodes. It gets the current visited
-    node and a data object, which it can update and should return it. This
-    data is returned by the function but never altered from the DFS itself.
-    :param root: The node to start the DFS from
-    :param fnc: The function to run on the nodes
-    :return: A data object, which can be altered from fnc.
-    """
-    data = None
-    stack = [root]
-    while stack:
-        node = stack.pop()
-        data = fnc(node, data)
-        for child in node.children.values():
-            stack.append(child)
-    return data
-
-
-def get_actions_and_states(node):
-    """
-    Returns a tuple of two lists containing the action and the state nodes
-    under the given node.
-    :param node:
-    :return: A tuple of two lists
-    """
-    return depth_first_search(node, _get_actions_and_states)
-
-
-def _get_actions_and_states(node, data):
-    if data is None:
-        data = ([], [])
-
-    action_nodes, state_nodes = data
-
-    if isinstance(node, ActionNode):
-        action_nodes.append(node)
-    elif isinstance(node, StateNode):
-        state_nodes.append(node)
-
-    return action_nodes, state_nodes
+        return [a for a in self.children if self.children[a].visited == 0]
