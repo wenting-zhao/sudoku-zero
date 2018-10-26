@@ -10,6 +10,7 @@ class MCTS():
     """
     def __init__(self, sudoku_size, ucb1_confidence=1.41):
         self.sudoku_size = sudoku_size
+        self.max_depth = self.sudoku_size ** 2
         self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
         self.ucb1_confidence = ucb1_confidence
 
@@ -72,14 +73,16 @@ class MCTS():
         # TODO: in each iteration, need to add new constraints for two purposes:
         #       1) know which node to choose next
         #       2) know when to stop
-        #       3) when depth is n*n, then the search can stop because a solution has found
-        while len(state_node.children) != 0:
+        while len(state_node.children) != 0 and depth < self.max_depth:
             depth += 1
             action = random.choice(state_node.state.actions)
             parent = state
             state = parent.perform(action)
 
         return reward
+
+    def _update_constraints(node, temporary=True):
+        depth = 
 
     def UCB1(node):
         return (node.score +
@@ -136,7 +139,7 @@ class MCTS():
         for i in range(len(sudoku)):
             for j in range(len(sudoku)):
                 possible_values[(i, j)] = len(constraints[i] & constraints[j+sudoku_size] & constraints[which_group[(i, j)]+2*sudoku_size])
-                return sorted(possible_values.items(), key=lambda kv: kv[1])
+        return sorted(possible_values.items(), key=lambda kv: kv[1])
 
 
 class Node(Node):
