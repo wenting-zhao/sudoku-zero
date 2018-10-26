@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 import argparse
 import time
+import sys
 
 from model_base import model_base
 
@@ -165,6 +166,7 @@ class model(model_base):
                 grads = self._average_gradients(tower_grads)
                 apply_gradient_op = optimizer.apply_gradients(grads, global_step=self.global_step)
                 self.train_step = apply_gradient_op
+                self.loss = tf.reduce_mean(tower_loss)
 
                 tf.summary.scalar("lr", lr)
                 self.summary_step = tf.summary.merge_all()
@@ -194,7 +196,7 @@ class model(model_base):
         num_sample_per_step = self.batch_size
         sample_per_sec = num_sample_per_step  * print_step / duration
         sec_per_batch = duration / print_step
-        format_str = ("global step %d loss %.3f; &.1f samples/sec; %.3f sec/batch")
+        format_str = ("global step %d loss %.3f; %.1f samples/sec; %.3f sec/batch")
         print (format_str % (global_step, loss, sample_per_sec, sec_per_batch))
         sys.stdout.flush()
 
