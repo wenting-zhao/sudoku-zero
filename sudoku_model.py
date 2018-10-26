@@ -12,7 +12,7 @@ class sudoku_model(model):
         super().__init__(args, mode, gpu_list)
         self.args = args
 
-    def _forward(self, inputs, batch_size, is_train, device, reuse, regularizer=None, rot_var=None):
+    def _forward(self, inputs, batch_size, is_train, dev, reuse, regularizer=None, rot_var=None):
         X, _ = inputs
         n_filter=16
         n_extra = 8
@@ -22,14 +22,14 @@ class sudoku_model(model):
         net = tf_utils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet1")
         net = tf_utils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet2")
 
-        net = tf_utils.conv_bn_relu(net, n_filter, kernel_size=3, scope="reduce", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
+        net = tf_utils.conv_bn_relu(net, n_filter, k_size=3, scope="reduce", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
         
         net = tf_utils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet3")
         net = tf_utils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet4")
         net = tf_utils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet5")
 
         # Value
-        value = tf_utils.conv_bn_relu(net, 1, 1, scope="value0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regulrizer)
+        value = tf_utils.conv_bn_relu(net, 1, 1, scope="value0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
         value = tf.contrib.layers.flatten(value)
         value = tf.contrib.layers.fully_connected(value, 256, scope="value1", reuse=reuse, weights_regularizer=regularizer)
         value = tf.contrib.layers.fully_connected(value, 1, activation_fn=tf.nn.relu, scope="value2", reuse=reuse, weights_regularizer=regularizer)
@@ -38,10 +38,10 @@ class sudoku_model(model):
         # Policy
         policy = tf_utils.conv_bn_relu(net, 2, 1, scope="policy0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
         policy = tf.contrib.layers.flatten(policy)
-        logit = tf.conrib.layers.fully_connected(policy, self.args.board_size ** 2 + 1, scope="policy1", activation_fn=None, reuse=reuse, weights_regularizer=regularizer)
+        logit = tf.contrib.layers.fully_connected(policy, self.args.board_size ** 2 + 1, scope="policy1", activation_fn=None, reuse=reuse, weights_regularizer=regularizer)
         pred = tf.nn.softmax(logit)
 
-        value = tf.idnetity(value, "value_output")
+        value = tf.identity(value, "value_output")
         pred = tf.identity(pred, "policy_output")
 
         return logit, pred, value

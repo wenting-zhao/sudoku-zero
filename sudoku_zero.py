@@ -21,7 +21,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
     print ("Creat process pname=%s, pid=%d" % (cur_process.name, cur_process.pid))
 
     board_size = args.board_size 
-    module = importlib.import_moduel(args.type)
+    module = importlib.import_module(args.type)
     model = module.sudoku_model(args, mode="predict", gpu_list=str(gpu_id))
     #model = M(args, mode="predict", gpu_list=str(gpu_id))
     model.preprocess()
@@ -37,7 +37,10 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
 
             start_time = time.time()
             is_print = verbose and game_in_thread % 10 == 0
-            model.load_model()
+            if args.load:
+                model.load_model()
+            else:
+                print ("Train from the scratch!")
 
             step = model.get_step()
 
@@ -63,7 +66,7 @@ def slave():
 
     lock = Lock()
 
-    gpu_ids = args.gpu_list.aplit(",")
+    gpu_ids = args.gpu_list.split(",")
     for i in range(args.num_thread):
         sub_process = Process(target=meditation, args=[np.random.RandomState(np.random.randint(0, 1000000)), i % len(gpu_ids), queue, lock, i == 0])
         sub_process.start()
@@ -72,11 +75,11 @@ def slave():
         pass
 
 def train_worker(train_agent):
-    summary_writer = tf.summary.FileWiter("%s-sudoku-zero.log" % args.type, train_agent.sess.graph)
+    summary_writter = tf.summary.FileWriter("%s-sudoku-zero.log" % args.type, train_agent.sess.graph)
     start_time = time.time()
     while True:
         global_step = train_agent.get_step()
-        train_agent.train(summary_writter, n_step=20)
+        train_agent.train(summary_writter, print_step=20)
 
         if global_step % args.save_every == 0 and global_step > 0:
             train_agent.saver.save(train_agent.sess, os.path.join(args.model_path, "model.ckpt"), global_step=global_step)
@@ -105,7 +108,10 @@ def train(cluster):
     #train_agent = M(args, mode="train", gpu_list=args.train_gpu)
     train_agent.preprocess()
     train_agent.build_model()
-    train_agent.load_model()
+    if args.load:
+        train_agent.load_model()
+    else:
+        print ("Train from scratch!")
     
     train_thread = threading.Thread(target=train_worker, args=[train_agent])
     train_thread.daemon = True
@@ -115,9 +121,6 @@ def train(cluster):
     while True:
         (history, nxt_move, label) = queue.get()
         if n_sample % 1000 == 0:
-            print (type(history))
-            print (type(nxt_move))
-            print (type(label))
             size = train_agent.push_sample(history, nxt_move, label, ret_size=True)
             print ("Num training sample=%d, tf queue size=%d" % (n_sample, size))
         else:
@@ -132,6 +135,7 @@ if __name__ == "__main__":
     argparser.add_argument("--gpu_list", type=str, default="0")
     argparser.add_argument("--feature_num", type=int, default=10)
     argparser.add_argument("--mode", type=str, default="miao")
+    argparser.add_argument("--load", type=int, default=0)
     argparser.add_argument("--lr", type=float, default=0.001)
     argparser.add_argument("--l2", type=float, default=0.000001)
 

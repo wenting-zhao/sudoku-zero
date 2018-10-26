@@ -20,7 +20,7 @@ class model(model_base):
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logit, labels=nxt_move)
         cross_entropy_mean = tf.reduce_mean(cross_entropy)
 
-        v_diff = tf.squard_difference(value, label)
+        v_diff = tf.squared_difference(value, label)
         v_loss = tf.reduce_mean(v_diff)
 
         reg_variables_gradients = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
@@ -89,15 +89,11 @@ class model(model_base):
                 self.sample_buffer = sample_buffer = tf.RandomShuffleQueue(capacity=self.args.buffer_size, min_after_dequeue=self.args.min_buffer_size, 
                                                                             shapes=[[self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size ** 2 + 1], []], 
                                                                             dtypes=[tf.float32, tf.float32, tf.float32, tf.float32])
-                print (type(features))
-                print (type(search_prob))
-                print (type(nxt_move))
-                print (type(label))
 
                 self.feed_step = sample_buffer.enqueue((features, search_prob, nxt_move, label))
                 self.queue_size = sample_buffer.size()
             else:
-                if self.model == "predict":
+                if self.mode == "predict":
                     X = []
                     pi = []
                     history = self.history = _placeholder(tf.string, name='history')
@@ -111,7 +107,7 @@ class model(model_base):
                     pi = tf.reshape(pi, [self.batch_size, self.args.board_size, self.args.board_size, 1], name="pi")
 
                 self.X = X
-                self.pi = tf.reshpe(pi, [self.batch_size, self.args.board_size, self.args.board_size])
+                self.pi = tf.reshape(pi, [self.batch_size, self.args.board_size, self.args.board_size])
 
     def build_model(self):
         board_size = self.args.board_size
@@ -119,7 +115,7 @@ class model(model_base):
         with self.graph.as_default():
             if self.mode == "predict":
                 with tf.device('/gpu:%s' % self.gpu_list[0]):
-                    logit, _, value = self._forward([self.x, self.pi], batch_size, False, device='tower0', reuse=None)
+                    logit, _, value = self._forward([self.X, self.pi], batch_size, False, dev='tower0', reuse=None)
                     prob = tf.nn.softmax(logit)
                     self.prob = tf.identity(prob, "policy_output")
                     self.value = tf.identity(value, "value_output")
@@ -148,9 +144,9 @@ class model(model_base):
                             gpu_batch_size = batch_size / n_gpu # This should be diveded 
                             regularizer = tf.contrib.layers.l2_regularizer(self.args.l2)
                             if i == 0:
-                                logit, prob, v = self._forward([batch_X[i], batch_pi[i]], gpu_batch_size, is_train=True, device="tower%d"%i, reuse=None, regularizer=regularizer)
+                                logit, prob, v = self._forward([batch_X[i], batch_pi[i]], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=None, regularizer=regularizer)
                             else:
-                                logit, prob, v = self._forward([batch_X[i], batch_pi[i]], gpu_batch_size, is_train=True, device="tower%d"%i, reuse=True, regularizer=regularizer)
+                                logit, prob, v = self._forward([batch_X[i], batch_pi[i]], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=True, regularizer=regularizer)
 
                             tower_prob.append(prob)
                             ce, mse, reg, loss, kl = self._loss(logit, v, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
@@ -175,7 +171,7 @@ class model(model_base):
 
             init = tf.global_variables_initializer()
             self.sess.run(init)
-            self.saver = tf.train.Saver(tf.global_variablies(), max_to_keep=50)
+            self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=50)
             self.all_var = tf.global_variables()
 
     def push_sample(self, features, nxt_move, label, get_cur_size=False):

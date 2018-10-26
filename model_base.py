@@ -55,7 +55,7 @@ class model_base(object):
     def load_model(self, path=None):
         if path is None:
             path = self.model_path
-        ckpt = tf.train.get_checkpoiint_state(path)
+        ckpt = tf.train.get_checkpoint_state(path)
         if ckpt and ckpt.model_checkpoint_path:
             if ckpt.model_checkpoing_path == self.cur_checkpoint:
                 print ("Do not load the same model %s again" % (ckpt.model_checkpoint_path))

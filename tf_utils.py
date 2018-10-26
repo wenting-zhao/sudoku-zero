@@ -29,6 +29,21 @@ def resnet_bn_block(x, n_channel, is_train, dev, scope=None, reuse=True, expand_
             x = shortcut + x
         return x
 
+def resnet_bn_block_normal(x,n_channel,is_train,dev,scope=None,reuse=True,decay=0.99, weights_regularizer=None):
+    with tf.variable_scope(scope):
+        shortcut=x
+        x=tf.contrib.layers.conv2d(x,num_outputs=n_channel,kernel_size=(3,3),biases_initializer=None,activation_fn=None,scope='conv0',reuse=reuse, weights_regularizer=weights_regularizer)
+        with tf.variable_scope('%s-bn1'%dev):
+            x = tf.contrib.layers.batch_norm(x,center=True,scale=True,is_training=is_train,activation_fn=tf.nn.relu,
+                                                updates_collections=None, reuse=None, decay=decay,fused=True)
+        x=tf.contrib.layers.conv2d(x,num_outputs=n_channel,kernel_size=(3,3),biases_initializer=None,activation_fn=None,scope='conv1',reuse=reuse,weights_regularizer=weights_regularizer)
+        with tf.variable_scope('%s-bn2'%dev):
+            x = tf.contrib.layers.batch_norm(x,center=True,scale=True,is_training=is_train,
+                                                updates_collections=None, reuse=None, decay=decay,fused=True)
+        x=shortcut+x
+        x=tf.nn.relu(x)
+    return x
+
 def resnet_bn_block_preact(x, n_channel, is_train, dec, scope=None, reuse=True, decay=0.99, weights_regularizer=None, first_layer=False):
     with tf.variable_scope(scope):
         shortcut = x
@@ -44,7 +59,7 @@ def resnet_bn_block_preact(x, n_channel, is_train, dec, scope=None, reuse=True, 
     return x
 
 def conv_bn_relu(x, n_channel, k_size, is_train, dev, scope=None, reuse=True, decay=0.99, weights_regularizer=None, head_bn=False):
-    with tf.Variable_scope(scope):
+    with tf.variable_scope(scope):
         if head_bn: 
             with tf.variable_scope('%s-bn-head'%dev):
                 x = tf.contrib.layers.batch_norm(x, center=True, scale=True, is_training=is_train, activation_fn=tf.nn.relu, updates_collections=None, reuse=None, decay=decay, fused=True)
