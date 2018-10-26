@@ -106,7 +106,7 @@ class model(model_base):
                     X = tf.reshape(X, [self.batch_size, self.args.board_size, self.args.board_size, self.args.feature_num], name="X")
                     pi = tf.reshape(pi, [self.batch_size, self.args.board_size, self.args.board_size, 1], name="pi")
 
-                self.X = X
+                self.X = tf.to_float(X)
                 self.pi = tf.reshape(pi, [self.batch_size, self.args.board_size, self.args.board_size])
 
     def build_model(self):

@@ -51,7 +51,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             # TODO: Collect the data
 
             # JUST FOR TEST: Random generate data for test
-            data = (np.random.random((9, 9, 10), dtype=np.float32), 2.0, 10.0)
+            data = (np.random.random((9, 9, 10)), np.random.random(82), 10.0)
             queue.put(data)
             
         except Exception as e:
@@ -121,7 +121,7 @@ def train(cluster):
     while True:
         (history, nxt_move, label) = queue.get()
         if n_sample % 1000 == 0:
-            size = train_agent.push_sample(history, nxt_move, label, ret_size=True)
+            size = train_agent.push_sample(history, nxt_move, label, get_cur_size=True)
             print ("Num training sample=%d, tf queue size=%d" % (n_sample, size))
         else:
             train_agent.push_sample(history, nxt_move, label)
