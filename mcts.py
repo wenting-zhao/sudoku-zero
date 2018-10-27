@@ -19,26 +19,25 @@ class MCTS():
         """
         Run the monte carlo tree search.
 
-        :param root: The StateNode
         :param n: The number of roll-outs to be performed
         :return:
         """
-
+        self.explored_nodes = self._get_explored_nodes(sudoku_state)
         self.constraints = self._get_constraints(sudoku_state)
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
-        self.search_order = self._get_search_order()
+        self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
 
         root = Node(parent=None, action=None, pos=None)
         root.depth = 0
         if len(self.search_order[0][1]) == 1:
             print("Next node is determined without running MCTS.")
-            return self.search_order[0][1][0]
+            return self.search_order[0][0], self.search_order[0][1].pop()
         else:
             pos, possible_values = self.search_order.pop()
             self._create_leaves(root, pos, possible_values)
 
         for _ in range(n):
-            node = self._get_next_node(root, self.tree_policy)
+            node, all_parents = self._get_next_node(root)
             node.reward, move_sequence = self._roll_out(node)
             # when a solution is found in rollout...
             if node.reward == self.max_depth:
@@ -47,7 +46,8 @@ class MCTS():
                 return move_sequence
             backup(node)
 
-        return _best_child(root)
+        best_child = self._best_child(root)
+        return best_child.pos, best_child.action
 
     def _best_child(self, node):
         most_promising_node = 0
@@ -92,19 +92,23 @@ class MCTS():
             new_constraints[self.which_group[(x, y)]+2*self.sudoku_size].remove(node.action)
         return self._get_search_order(new_constraints).pop()
 
-    def _roll_out(self, node, cell_possible_actions):
+    def _roll_out(self, node):
         depth = node.depth
         move_sequence = []
-        cell_possible_actions = copy.deepcopy(self.search_order)
+        cell_possible_actions = {i[0]:i[1] for i in self.search_order}
         while depth < self.max_depth:
             depth += 1
             move_sequence.append((node.pos, node.action))
             for i in range(self.sudoku_size):
-                if cell_possible_actions[(i, node.pos[1])]:
+                if (i, node.pos[1]) in cell_possible_actions:
                     cell_possible_actions[(i, node.pos[1])].remove(node.action)
             for j in range(self.sudoku_size):
-                if cell_possible_actions[(node.pos[0], j)]:
+                if (node.pos[0], j) in cell_possible_actions:
                     cell_possible_actions[(node.pos[0], j)].remove(node.action)
+            for (i, j) in self.box_group[self.which_group[(i,j)]]:
+                if (i, j) in cell_possible_actions:
+                    if node.action != cell_possible_actions[(i, j)]:
+                        cell_possible_actions[(i, j)].remove(node.action)
             pos, actions = sorted(cell_possible_actions.items(), key=lambda kv: len(kv[1])).pop()
             if len(actions) == 0:
                 break
@@ -135,10 +139,9 @@ class MCTS():
             node.children.add(new_child)
 
     def _get_constraints(self, sudoku):
-        sudoku = np.asarray(sudoku)
         constraints = []
 
-        assert sudoku_size == sudoku.shape[0], sudoku_size == sudoku.shape[1]
+        assert self.sudoku_size == sudoku.shape[0], self.sudoku_size == sudoku.shape[1]
 
         # get row constraints, each element in the constraints list is also a list,
         # representing which elements are still available for that row
@@ -157,6 +160,8 @@ class MCTS():
 
     def _get_box_group(self, sudoku_size):
         i = 0
+        box_group = dict()
+        which_group = dict()
         sqrt_n = int(np.sqrt(sudoku_size))
         for x in range(0, sudoku_size, sqrt_n):
             for y in range(0, sudoku_size, sqrt_n):
@@ -166,27 +171,39 @@ class MCTS():
                 i += 1
         return box_group, which_group
 
-    def _get_search_order(self, constraints):
+    def _get_search_order(self, constraints, explored):
         possible_values = dict()
-        for i in range(len(sudoku)):
-            for j in range(len(sudoku)):
-                possible_values[(i, j)] = constraints[i] & constraints[j+self.sudoku_size] & constraints[self.which_group[(i, j)]+2*self.sudoku_size]
+        for i in range(self.sudoku_size):
+            for j in range(self.sudoku_size):
+                if explored[i, j] == 0:
+                    possible_values[(i, j)] = constraints[i] & constraints[j+self.sudoku_size] & constraints[self.which_group[(i, j)]+2*self.sudoku_size]
         return sorted(possible_values.items(), key=lambda kv: len(kv[1]))
 
+    def _get_explored_nodes(self, sudoku):
+        explored = copy.deepcopy(sudoku)
+        for (i, j), x in np.ndenumerate(explored):
+            if x == 0:
+                explored[i, j] = False
+            else:
+                explored[i, j] = True
+        return explored
 
-class Node(Node):
+
+class Node():
     """
     A node holding a state in the tree.
     """
     def __init__(self, parent, action, pos):
         self.parent = parent
-        self.children = {}
+        self.children = set()
         self.action = action  # a number from 1-9
-        self.depth = parent.depth + 1
         self.visited = 0
         self.score = 0
         self.reward = 0
         self.pos = pos
+
+        if self.parent is not None:
+            self.depth = parent.depth + 1
 
     def untried_nodes(self):
         return [node for node in self.children if node.visited == 0]

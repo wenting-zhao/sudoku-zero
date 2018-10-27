@@ -1,19 +1,23 @@
+from mcts import MCTS
 import numpy as np
 
+sudoku = np.asarray([[0, 0, 0, 0, 0, 0, 0, 1, 0],
+                     [4, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 2, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 5, 0, 4, 0, 7],
+                     [0, 0, 8, 0, 0, 0, 3, 0, 0],
+                     [0, 0, 1, 0, 9, 0, 0, 0, 0],
+                     [3, 0, 0, 4, 0, 0, 2, 0, 0],
+                     [0, 5, 0, 1, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 8, 0, 6, 0, 0, 0]])
 
-class Sudoku():
-    # init_state: 9x9 2d numpy array
-    def __init__(self, init_state):
-        self.state = init_state
 
-    # action: (x-position, y-position, value)
-    def perform(self, action):
-        x, y, value = action
-        self.state[x][y] = value
-        return self.state
+def main():
+    mcts = MCTS(sudoku_size=9)
+    while 0 in sudoku[:, :]:
+        (x, y), action = mcts(sudoku)
+        sudoku[x, y] = action
+        print("best_action", (x, y), action)
 
-    def reward(self, parent, action):
-        pass
-
-    def is_terminal(self):
-        pass
+if __name__ == '__main__':
+    main()
