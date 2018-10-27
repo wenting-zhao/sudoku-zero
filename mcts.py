@@ -11,7 +11,7 @@ class MCTS():
     """
     def __init__(self, sudoku_size, ucb1_confidence=1.41):
         self.sudoku_size = sudoku_size
-        self.max_depth = self.sudoku_size ** 2
+        self.num_cells = self.sudoku_size ** 2
         self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
         self.ucb1_confidence = ucb1_confidence
 
@@ -22,50 +22,53 @@ class MCTS():
         :param n: The number of roll-outs to be performed
         :return:
         """
+        self.sudoku = sudoku_state
         self.explored_nodes = self._get_explored_nodes(sudoku_state)
         self.constraints = self._get_constraints(sudoku_state)
+        self.max_depth = self.num_cells - np.count_nonzero(self.explored_nodes)
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
-
-        root = Node(parent=None, action=None, pos="root")
-        root.depth = 0
-        if len(self.search_order[0][1]) == 1:
-            print("Next node is determined without running MCTS.")
-            return self.search_order[0][0], self.search_order[0][1].pop()
+        if len(self.search_order[0][1]) == 0:
+            return [(self.search_order[0][0], "unsatisfiable")]
+        elif len(self.search_order[0][1]) == 1:
+            #print("Next node is determined without running MCTS.")
+            return [(self.search_order[0][0], self.search_order[0][1].pop())]
         else:
+            root = Node(parent=None, action=None, pos="root")
+            root.depth = 0
             pos, possible_values = self.search_order.pop()
             self._create_leaves(root, pos, possible_values)
 
         for _ in range(n):
             node, ancestors = self._get_next_node(root)
-            print("next node: ", node.pos, node.action)
             node.reward, move_sequence = self._roll_out(node, ancestors)
-            print(move_sequence)
             # when a solution is found in rollout...
             if node.reward == self.max_depth:
                 while node.parent is not None:
                     move_sequence.append(((node.pos), node.action))
+                    node = node.parent
+                print("rollout found to be a sol'n.")
                 return move_sequence
             self.backup(node)
 
         best_child = self._best_child(root)
-        return best_child.pos, best_child.action
+        return [(best_child.pos, best_child.action)]
 
     def _best_child(self, node):
         most_promising_node = 0
         most_promising = 0
-        deepest_node = 0
-        deepest = 0
+        #deepest_node = 0
+        #deepest = 0
         for child in node.children:
             ucb1 = self.UCB1(child)
             if ucb1 > most_promising:
                 most_promising = ucb1
                 most_promising_node = child
-            if child.depth > deepest:
-                deepest = child.depth
-                deepest_node = child
-            if most_promising_node.action != deepest_node.action:
-                print("deepest node isn't most promising node.")
+            #if child.depth > deepest:
+            #    deepest = child.depth
+            #    deepest_node = child
+            #if most_promising_node.action != deepest_node.action:
+            #    print("deepest node isn't most promising node.")
         return most_promising_node
 
     def _get_next_node(self, node):
@@ -108,6 +111,8 @@ class MCTS():
         while depth < self.max_depth:
             depth += 1
             move_sequence.append((node.pos, node.action))
+            if len(cell_possible_actions) == 0:
+                break
             for i in range(self.sudoku_size):
                 if (i, node.pos[1]) in cell_possible_actions:
                     if node.action in cell_possible_actions[(i, node.pos[1])]:
@@ -125,7 +130,16 @@ class MCTS():
                 break
             else:
                 node = Node(node, random.choice(list(actions)), pos)
+        print(depth, len(move_sequence), np.count_nonzero(new_explored))
+        assert depth == len(move_sequence)+np.count_nonzero(new_explored)
         return depth, move_sequence
+
+    def print_rollout(self, move_sequence, ancestors):
+        rollout = self.sudoku
+        for move in move_sequence+ancestors:
+            (x, y), action = move
+            rollout[x, y] = action
+        print(rollout)
 
     def UCB1(self, node):
         return (node.score +
@@ -157,16 +171,16 @@ class MCTS():
         # get row constraints, each element in the constraints list is also a list,
         # representing which elements are still available for that row
         for i in range(self.sudoku_size):
-            constraints.append(set(range(1,10)) - set(sudoku[i, :]))
+            constraints.append(set(range(1,self.sudoku_size+1)) - set(sudoku[i, :]))
 
         # column constraints
         for i in range(self.sudoku_size):
-            constraints.append(set(range(1,10)) - set(sudoku[:, i]))
+            constraints.append(set(range(1,self.sudoku_size+1)) - set(sudoku[:, i]))
 
         # box constraints
         for key in self.box_group.keys():
             box_number = set([sudoku[x, y] for (x, y) in self.box_group[key]])
-            constraints.append(set(range(1,10)) - set(box_number))
+            constraints.append(set(range(1,self.sudoku_size+1)) - set(box_number))
         return constraints
 
     def _get_box_group(self, sudoku_size):
