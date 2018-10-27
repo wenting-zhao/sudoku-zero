@@ -37,16 +37,16 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
 
             start_time = time.time()
             is_print = verbose and game_in_thread % 10 == 0
-            if args.load:
-                model.load_model()
-            else:
-                print ("Train from the scratch!")
+            
+            # Renew the model based on some rules
+            model.load_model()
 
             step = model.get_step()
 
             # Interface
-            #mcts = MCTS()
+            # mcts = MCTS()
             # TODO: MCTS Logic
+            # You could pass the model as an argument into the MCTS class, and use model.predict to get the prediction given by NN
 
             # TODO: Collect the data
             # Dataformat: (history, label_prob_distibution, reward)
