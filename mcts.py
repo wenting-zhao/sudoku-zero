@@ -39,9 +39,9 @@ class MCTS():
 
         for _ in range(n):
             node = self._get_next_node(root, self.tree_policy)
-            node.score, move_sequence = self._roll_out(node)
+            node.reward, move_sequence = self._roll_out(node)
             # when a solution is found in rollout...
-            if node.score == self.max_depth:
+            if node.reward == self.max_depth:
                 while node.parent is not None:
                     move_sequence.append(((node.pos), node.action))
                 return move_sequence
@@ -79,8 +79,8 @@ class MCTS():
                 all_parents.append(((node.pos), node.action))
                 if len(node.children) == 0:
                     pos, possible_values = self._next_level(all_parents)
-                    self._create_leaves(root, pos, possible_values)
-        return node, all_parents
+                    self._create_leaves(node, pos, possible_values)
+        return random.choice(node.children), all_parents
 
     # compute next level that has fewest available actions
     def _next_level(self, additional_nodes):
@@ -95,9 +95,9 @@ class MCTS():
     def _roll_out(self, node, cell_possible_actions):
         depth = node.depth
         move_sequence = []
+        cell_possible_actions = copy.deepcopy(self.search_order)
         while depth < self.max_depth:
             depth += 1
-            node = random.choice(node.children)
             move_sequence.append((node.pos, node.action))
             for i in range(self.sudoku_size):
                 if cell_possible_actions[(i, node.pos[1])]:
@@ -123,14 +123,11 @@ class MCTS():
         See feldman amd Domshlak (2014) for reference.
         :param node: The node to start the backup from
         """
-        r = node.score
+        r = node.reward
         while node is not None:
             node.visited += 1
             node.score = ((node.visited - 1)/node.visited) * node.score + 1/node.visited * r
-            # record the current path
             node = node.parent
-
-        return score
 
     def _create_leaves(self, node, pos, available_moves):
         for move in available_moves:
@@ -188,6 +185,7 @@ class Node(Node):
         self.depth = parent.depth + 1
         self.visited = 0
         self.score = 0
+        self.reward = 0
         self.pos = pos
 
     def untried_nodes(self):
