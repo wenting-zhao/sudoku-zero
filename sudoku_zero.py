@@ -49,6 +49,8 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             # TODO: MCTS Logic
 
             # TODO: Collect the data
+            # Dataformat: (history, label_prob_distibution, reward)
+            # label_prob_distribution: Softmax of visit number of each node
 
             # JUST FOR TEST: Random generate data for test
             data = (np.random.random((9, 9, 10)), np.random.random(82), 10.0)
