@@ -15,9 +15,10 @@ sudoku = np.asarray([[0, 0, 0, 0, 0, 0, 0, 1, 0],
 def main():
     mcts = MCTS(sudoku_size=9)
     while 0 in sudoku[:, :]:
-        (x, y), action = mcts(sudoku)
+        (x, y), action = mcts(sudoku, n=100)
         sudoku[x, y] = action
         print("best_action", (x, y), action)
+        print(sudoku)
 
 if __name__ == '__main__':
     main()

@@ -27,7 +27,7 @@ class MCTS():
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
 
-        root = Node(parent=None, action=None, pos=None)
+        root = Node(parent=None, action=None, pos="root")
         root.depth = 0
         if len(self.search_order[0][1]) == 1:
             print("Next node is determined without running MCTS.")
@@ -37,14 +37,16 @@ class MCTS():
             self._create_leaves(root, pos, possible_values)
 
         for _ in range(n):
-            node, all_parents = self._get_next_node(root)
-            node.reward, move_sequence = self._roll_out(node)
+            node, ancestors = self._get_next_node(root)
+            print("next node: ", node.pos, node.action)
+            node.reward, move_sequence = self._roll_out(node, ancestors)
+            print(move_sequence)
             # when a solution is found in rollout...
             if node.reward == self.max_depth:
                 while node.parent is not None:
                     move_sequence.append(((node.pos), node.action))
                 return move_sequence
-            backup(node)
+            self.backup(node)
 
         best_child = self._best_child(root)
         return best_child.pos, best_child.action
@@ -67,53 +69,62 @@ class MCTS():
         return most_promising_node
 
     def _get_next_node(self, node):
-        all_parents = []
+        ancestors = []
         while node.depth < self.max_depth:
             untried_nodes = node.untried_nodes()
             if len(untried_nodes) > 0:
                 untried = random.choice(untried_nodes)
-                all_parents.append(((untried.pos), untried.action))
-                return untried, all_parents
+                ancestors.append(((untried.pos), untried.action))
+                return untried, ancestors
             else:
                 node = self._best_child(node)
-                all_parents.append(((node.pos), node.action))
+                ancestors.append(((node.pos), node.action))
                 if len(node.children) == 0:
-                    pos, possible_values = self._next_level(all_parents)
+                    new_constraints = self._update_constraints(ancestors)
+                    explored = self._update_explored(ancestors)
+                    next_level = self._get_search_order(new_constraints, explored).pop()
+                    pos, possible_values = next_level
                     self._create_leaves(node, pos, possible_values)
-        return random.choice(node.children), all_parents
+        return random.choice(node.children), ancestors
 
     # compute next level that has fewest available actions
-    def _next_level(self, additional_nodes):
+    def _update_constraints(self, additional_nodes):
         new_constraints = copy.deepcopy(self.constraints)
         for node in additional_nodes:
-            x, y = node.pos
-            new_constraints[x].remove(node.action)
-            new_constraints[y+self.sudoku_size].remove(node.action)
-            new_constraints[self.which_group[(x, y)]+2*self.sudoku_size].remove(node.action)
-        return self._get_search_order(new_constraints).pop()
+            (x, y), action = node
+            new_constraints[x].remove(action)
+            new_constraints[y+self.sudoku_size].remove(action)
+            new_constraints[self.which_group[(x, y)]+2*self.sudoku_size].remove(action)
+        return new_constraints
 
-    def _roll_out(self, node):
+    def _roll_out(self, node, ancestors):
         depth = node.depth
+        # record move sequence in case this rollout find a sol'n
         move_sequence = []
-        cell_possible_actions = {i[0]:i[1] for i in self.search_order}
+        new_constraints = self._update_constraints(ancestors)
+        new_explored = self._update_explored(ancestors)
+        cell_possible_actions = self._get_search_order(new_constraints, new_explored)
+        cell_possible_actions = {i[0]: i[1] for i in cell_possible_actions}
         while depth < self.max_depth:
             depth += 1
             move_sequence.append((node.pos, node.action))
             for i in range(self.sudoku_size):
                 if (i, node.pos[1]) in cell_possible_actions:
-                    cell_possible_actions[(i, node.pos[1])].remove(node.action)
+                    if node.action in cell_possible_actions[(i, node.pos[1])]:
+                        cell_possible_actions[(i, node.pos[1])].remove(node.action)
             for j in range(self.sudoku_size):
                 if (node.pos[0], j) in cell_possible_actions:
-                    cell_possible_actions[(node.pos[0], j)].remove(node.action)
+                    if node.action in cell_possible_actions[(node.pos[0], j)]:
+                        cell_possible_actions[(node.pos[0], j)].remove(node.action)
             for (i, j) in self.box_group[self.which_group[(i,j)]]:
                 if (i, j) in cell_possible_actions:
-                    if node.action != cell_possible_actions[(i, j)]:
+                    if node.action in cell_possible_actions[(i, j)]:
                         cell_possible_actions[(i, j)].remove(node.action)
             pos, actions = sorted(cell_possible_actions.items(), key=lambda kv: len(kv[1])).pop()
             if len(actions) == 0:
                 break
             else:
-                node = Node(node, random.choice(actions), pos)
+                node = Node(node, random.choice(list(actions)), pos)
         return depth, move_sequence
 
     def UCB1(self, node):
@@ -187,6 +198,12 @@ class MCTS():
             else:
                 explored[i, j] = True
         return explored
+
+    def _update_explored(self, additional_nodes):
+        new_explored = copy.deepcopy(self.explored_nodes)
+        for pseudo_node in additional_nodes:
+            new_explored[pseudo_node[0]] = 1
+        return new_explored
 
 
 class Node():
