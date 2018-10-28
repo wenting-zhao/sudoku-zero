@@ -102,6 +102,8 @@ class MCTS():
 
     def _roll_out(self, node, ancestors):
         depth = node.depth
+        # make sure we make the right initial depth
+        assert depth == len(ancestors)
         # record move sequence in case this rollout find a sol'n
         move_sequence = []
         new_constraints = self._update_constraints(ancestors)
@@ -126,20 +128,22 @@ class MCTS():
                     if node.action in cell_possible_actions[(i, j)]:
                         cell_possible_actions[(i, j)].remove(node.action)
             pos, actions = sorted(cell_possible_actions.items(), key=lambda kv: len(kv[1])).pop()
+            del cell_possible_actions[pos]
             if len(actions) == 0:
                 break
             else:
                 node = Node(node, random.choice(list(actions)), pos)
-        print(depth, len(move_sequence), np.count_nonzero(new_explored))
-        assert depth == len(move_sequence)+np.count_nonzero(new_explored)
+        #self.print_rollout(move_sequence, ancestors)
+        assert depth == len(move_sequence)+len(ancestors)
         return depth, move_sequence
 
     def print_rollout(self, move_sequence, ancestors):
-        rollout = self.sudoku
+        rollout = copy.deepcopy(self.sudoku)
         for move in move_sequence+ancestors:
             (x, y), action = move
             rollout[x, y] = action
         print(rollout)
+        print(np.count_nonzero(rollout))
 
     def UCB1(self, node):
         return (node.score +
