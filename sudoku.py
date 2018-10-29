@@ -22,6 +22,8 @@ def main():
         # res can be more than one best action.
         for move in res:
             (x, y), action = move
+        if len(res) > 1:
+            break
         if action == "unsatisfiable":
             print("unsatisfiable", (x, y))
             print(sudoku)
