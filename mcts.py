@@ -58,7 +58,6 @@ class MCTS():
                 return move_sequence
             self.backup(node)
 
-        best_child = self._best_child(root)
         best_child = sorted(root.children, key=lambda e: e.visited, reverse=True)[0]
         return [(best_child.pos, best_child.action)]
 
