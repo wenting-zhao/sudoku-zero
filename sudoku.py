@@ -15,9 +15,9 @@ sudoku = np.zeros((9,9))
 
 
 def main():
-    mcts = MCTS(sudoku_size=9, ucb1_confidence=5)
+    mcts = MCTS(sudoku_size=9, ucb1_confidence=5, tree_policy="depth")
     while 0 in sudoku[:, :]:
-        res = mcts(sudoku, n=10)
+        res = mcts(sudoku, n=100)
         # since a solution can be found during rollout,
         # res can be more than one best action.
         for move in res:

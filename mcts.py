@@ -9,9 +9,10 @@ class MCTS():
     tree policy, a default policy, and a backup strategy.
     See e.g. Browne et al. (2012) for a survey on monte carlo tree search
     """
-    def __init__(self, sudoku_size, ucb1_confidence=1.41):
+    def __init__(self, sudoku_size, ucb1_confidence=1.41, tree_policy="UCB1"):
         self.sudoku_size = sudoku_size
         self.num_cells = self.sudoku_size ** 2
+        self.tree_policy = tree_policy
         self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
         self.ucb1_confidence = ucb1_confidence
 
@@ -40,7 +41,13 @@ class MCTS():
             self._create_leaves(root, pos, possible_values)
 
         for _ in range(n):
-            node, ancestors = self._get_next_node(root)
+            res = self._get_next_node(root)
+            if res is not None:
+                node, ancestors = res
+            else:
+                # no possible actions at this point, but later we need to
+                # think about how to deal with this case
+                break
             node.reward, move_sequence = self._roll_out(node, ancestors)
             # when a solution is found in rollout...
             if node.reward == self.max_depth:
@@ -52,6 +59,7 @@ class MCTS():
             self.backup(node)
 
         best_child = self._best_child(root)
+        best_child = sorted(root.children, key=lambda e: e.visited, reverse=True)[0]
         return [(best_child.pos, best_child.action)]
 
     def _best_child(self, node):
@@ -60,9 +68,9 @@ class MCTS():
         #deepest_node = 0
         #deepest = 0
         for child in node.children:
-            ucb1 = self.UCB1(child)
-            if ucb1 > most_promising:
-                most_promising = ucb1
+            val = self.compute_tree_policy(child)
+            if val > most_promising:
+                most_promising = val
                 most_promising_node = child
             #if child.depth > deepest:
             #    deepest = child.depth
@@ -80,6 +88,9 @@ class MCTS():
                 ancestors.append(((untried.pos), untried.action))
                 return untried, ancestors
             else:
+                # no possible actions at this point
+                if len(node.children) == 0:
+                    return None
                 node = self._best_child(node)
                 ancestors.append(((node.pos), node.action))
                 if len(node.children) == 0:
@@ -133,7 +144,7 @@ class MCTS():
                 break
             else:
                 node = Node(node, random.choice(list(actions)), pos)
-        #self.print_rollout(move_sequence, ancestors)
+        self.print_rollout(move_sequence, ancestors)
         assert depth == len(move_sequence)+len(ancestors)
         return depth, move_sequence
 
@@ -145,9 +156,14 @@ class MCTS():
         print(rollout)
         print(np.count_nonzero(rollout))
 
-    def UCB1(self, node):
-        return (node.score +
+    def compute_tree_policy(self, node):
+        res = None
+        if self.tree_policy == "UCB1":
+            res = (node.score +
                 self.ucb1_confidence * np.sqrt(2 * np.log(node.parent.visited) / node.visited))
+        elif self.tree_policy == "depth":
+            res = node.reward
+        return res
 
     def backup(self, node):
         """
