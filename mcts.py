@@ -11,10 +11,12 @@ class MCTS():
     """
     def __init__(self, sudoku_size, ucb1_confidence=1.41, tree_policy="UCB1"):
         self.sudoku_size = sudoku_size
-        self.num_cells = self.sudoku_size ** 2
+        self.max_depth = self.sudoku_size ** 2
         self.tree_policy = tree_policy
         self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
         self.ucb1_confidence = ucb1_confidence
+        self.root = Node(parent=None, action=None, pos="root")
+        self.root.depth = 0
 
     def __call__(self, sudoku_state, n=1500):
         """
@@ -26,7 +28,6 @@ class MCTS():
         self.sudoku = sudoku_state
         self.explored_nodes = self._get_explored_nodes(sudoku_state)
         self.constraints = self._get_constraints(sudoku_state)
-        self.max_depth = self.num_cells - np.count_nonzero(self.explored_nodes)
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
         if len(self.search_order[0][1]) == 0:
@@ -34,14 +35,13 @@ class MCTS():
         elif len(self.search_order[0][1]) == 1:
             #print("Next node is determined without running MCTS.")
             return [(self.search_order[0][0], self.search_order[0][1].pop())]
-        else:
-            root = Node(parent=None, action=None, pos="root")
-            root.depth = 0
-            pos, possible_values = self.search_order.pop()
-            self._create_leaves(root, pos, possible_values)
+
+        if self.root.pos == "root":
+            pos, possible_values = self.search_order.pop(0)
+            self._create_leaves(self.root, pos, possible_values)
 
         for _ in range(n):
-            res = self._get_next_node(root)
+            res = self._get_next_node(self.root)
             if res is not None:
                 node, ancestors = res
             else:
@@ -58,7 +58,8 @@ class MCTS():
                 return move_sequence
             self.backup(node)
 
-        best_child = sorted(root.children, key=lambda e: e.visited, reverse=True)[0]
+        best_child = sorted(self.root.children, key=lambda e: e.visited, reverse=True)[0]
+        self.root = best_child
         return [(best_child.pos, best_child.action)]
 
     def _best_child(self, node):
@@ -105,15 +106,21 @@ class MCTS():
         new_constraints = copy.deepcopy(self.constraints)
         for node in additional_nodes:
             (x, y), action = node
-            new_constraints[x].remove(action)
-            new_constraints[y+self.sudoku_size].remove(action)
-            new_constraints[self.which_group[(x, y)]+2*self.sudoku_size].remove(action)
+            try:
+                new_constraints[x].remove(action)
+                new_constraints[y+self.sudoku_size].remove(action)
+                new_constraints[self.which_group[(x, y)]+2*self.sudoku_size].remove(action)
+            # sometimes there is unit propagation between mcts calls, and thus the constraints
+            # are not updated in time, and thus there will be situations where an action is no
+            # longer possible but still in constraints
+            except KeyError:
+                pass
         return new_constraints
 
     def _roll_out(self, node, ancestors):
         depth = node.depth
         # make sure we make the right initial depth
-        assert depth == len(ancestors)
+        assert depth == len(ancestors) + self.root.depth
         # record move sequence in case this rollout find a sol'n
         move_sequence = []
         new_constraints = self._update_constraints(ancestors)
@@ -144,7 +151,7 @@ class MCTS():
             else:
                 node = Node(node, random.choice(list(actions)), pos)
         self.print_rollout(move_sequence, ancestors)
-        assert depth == len(move_sequence)+len(ancestors)
+        assert depth == len(move_sequence)+len(ancestors)+ self.root.depth
         return depth, move_sequence
 
     def print_rollout(self, move_sequence, ancestors):
