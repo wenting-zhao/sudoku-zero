@@ -37,7 +37,8 @@ class MCTS():
             return [(self.search_order[0][0], self.search_order[0][1].pop())]
 
         if self.root.pos == "root":
-            pos, possible_values = self.search_order.pop(0)
+            all_minimum = self._get_all_minimum(self.search_order)
+            pos, possible_values = random.choice(all_minimum)
             self._create_leaves(self.root, pos, possible_values)
 
         for _ in range(n):
@@ -96,8 +97,9 @@ class MCTS():
                 if len(node.children) == 0:
                     new_constraints = self._update_constraints(ancestors)
                     explored = self._update_explored(ancestors)
-                    next_level = self._get_search_order(new_constraints, explored).pop(0)
-                    pos, possible_values = next_level
+                    search_order = self._get_search_order(new_constraints, explored)
+                    all_minimum = self._get_all_minimum(search_order)
+                    pos, possible_values = random.choice(all_minimum)
                     self._create_leaves(node, pos, possible_values)
         return random.choice(node.children), ancestors
 
@@ -144,7 +146,9 @@ class MCTS():
                 if (i, j) in cell_possible_actions:
                     if node.action in cell_possible_actions[(i, j)]:
                         cell_possible_actions[(i, j)].remove(node.action)
-            pos, actions = sorted(cell_possible_actions.items(), key=lambda kv: len(kv[1])).pop(0)
+            search_order = sorted(cell_possible_actions.items(), key=lambda kv: len(kv[1]))
+            all_minimum = self._get_all_minimum(search_order)
+            pos, actions = random.choice(all_minimum)
             del cell_possible_actions[pos]
             if len(actions) == 0:
                 break
@@ -229,6 +233,14 @@ class MCTS():
                 if explored[i, j] == 0:
                     possible_values[(i, j)] = constraints[i] & constraints[j+self.sudoku_size] & constraints[self.which_group[(i, j)]+2*self.sudoku_size]
         return sorted(possible_values.items(), key=lambda kv: len(kv[1]))
+
+    def _get_all_minimum(self, search_order):
+        all_minimum = []
+        minimum = len(search_order[0][1])
+        for cell in search_order:
+            if len(cell[1]) == minimum:
+                all_minimum.append(cell)
+        return all_minimum
 
     def _get_explored_nodes(self, sudoku):
         explored = copy.deepcopy(sudoku)

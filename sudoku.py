@@ -1,5 +1,6 @@
 from mcts import MCTS
 import numpy as np
+import sys
 
 # sudoku = np.asarray([[0, 0, 0, 0, 0, 0, 0, 1, 0],
 #                      [4, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -11,11 +12,12 @@ import numpy as np
 #                      [0, 5, 0, 1, 0, 0, 0, 0, 0],
 #                      [0, 0, 0, 8, 0, 6, 0, 0, 0]])
 
-sudoku = np.zeros((9,9))
-
 
 def main():
-    mcts = MCTS(sudoku_size=9, ucb1_confidence=5, tree_policy="UCB1")
+    n = int(sys.argv[1])
+    c_map = {9: 5, 16: 16}
+    sudoku = np.zeros((n, n))
+    mcts = MCTS(sudoku_size=n, ucb1_confidence=c_map[n], tree_policy="UCB1")
     while 0 in sudoku[:, :]:
         res = mcts(sudoku, n=100)
         # since a solution can be found during rollout,
