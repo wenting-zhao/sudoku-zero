@@ -16,7 +16,7 @@ class MCTS():
         self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
         self.ucb1_confidence = ucb1_confidence
         self.root = Node(parent=None, action=None, pos="root")
-        self.root.depth = 0
+        self.root.depth = -1
 
     def __call__(self, sudoku_state, n=1500):
         """
@@ -96,7 +96,7 @@ class MCTS():
                 if len(node.children) == 0:
                     new_constraints = self._update_constraints(ancestors)
                     explored = self._update_explored(ancestors)
-                    next_level = self._get_search_order(new_constraints, explored).pop()
+                    next_level = self._get_search_order(new_constraints, explored).pop(0)
                     pos, possible_values = next_level
                     self._create_leaves(node, pos, possible_values)
         return random.choice(node.children), ancestors

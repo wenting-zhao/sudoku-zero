@@ -15,7 +15,7 @@ sudoku = np.zeros((9,9))
 
 
 def main():
-    mcts = MCTS(sudoku_size=9, ucb1_confidence=5, tree_policy="depth")
+    mcts = MCTS(sudoku_size=9, ucb1_confidence=5, tree_policy="UCB1")
     while 0 in sudoku[:, :]:
         res = mcts(sudoku, n=100)
         # since a solution can be found during rollout,
