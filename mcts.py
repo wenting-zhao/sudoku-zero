@@ -144,7 +144,7 @@ class MCTS():
                 if (i, j) in cell_possible_actions:
                     if node.action in cell_possible_actions[(i, j)]:
                         cell_possible_actions[(i, j)].remove(node.action)
-            pos, actions = sorted(cell_possible_actions.items(), key=lambda kv: len(kv[1])).pop()
+            pos, actions = sorted(cell_possible_actions.items(), key=lambda kv: len(kv[1])).pop(0)
             del cell_possible_actions[pos]
             if len(actions) == 0:
                 break
