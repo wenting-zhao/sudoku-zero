@@ -39,6 +39,7 @@ class MCTS():
         if self.root.pos == "root":
             all_minimum = self._get_all_minimum(self.search_order)
             pos, possible_values = random.choice(all_minimum)
+            self.root.depth = np.count_nonzero(self.explored_nodes) - 1
             self._create_leaves(self.root, pos, possible_values)
 
         for _ in range(n):
@@ -101,7 +102,7 @@ class MCTS():
                     all_minimum = self._get_all_minimum(search_order)
                     pos, possible_values = random.choice(all_minimum)
                     self._create_leaves(node, pos, possible_values)
-        return random.choice(node.children), ancestors
+        return random.choice(list(node.children)), ancestors
 
     # compute next level that has fewest available actions
     def _update_constraints(self, additional_nodes):
@@ -142,7 +143,7 @@ class MCTS():
                 if (node.pos[0], j) in cell_possible_actions:
                     if node.action in cell_possible_actions[(node.pos[0], j)]:
                         cell_possible_actions[(node.pos[0], j)].remove(node.action)
-            for (i, j) in self.box_group[self.which_group[(i,j)]]:
+            for (i, j) in self.box_group[self.which_group[node.pos]]:
                 if (i, j) in cell_possible_actions:
                     if node.action in cell_possible_actions[(i, j)]:
                         cell_possible_actions[(i, j)].remove(node.action)
