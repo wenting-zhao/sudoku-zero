@@ -20,20 +20,22 @@ def main():
     mcts = MCTS(sudoku_size=n, ucb1_confidence=c_map[n], tree_policy="UCB1")
     while 0 in sudoku[:, :]:
         res = mcts(sudoku, n=100)
-        # since a solution can be found during rollout,
-        # res can be more than one best action.
-        for move in res:
-            (x, y), action = move
-        if len(res) > 1:
-            break
-        if action == "unsatisfiable":
+        if res[0][1] == "unsatisfiable":
             print("unsatisfiable", (x, y))
-            print(sudoku)
             print(np.count_nonzero(sudoku))
             break
-        sudoku[x, y] = action
-        #print("best_action", (x, y), action)
-        #print(sudoku)
+
+        for move in res:
+            (x, y), action = move
+            sudoku[x, y] = action
+
+        print(sudoku)
+
+        if len(res) > 1:
+            print("finished!")
+            break
+        else:
+            print("best_action", (x, y), action)
 
 if __name__ == '__main__':
     main()

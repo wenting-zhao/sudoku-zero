@@ -46,18 +46,13 @@ class MCTS():
             res = self._get_next_node(self.root)
             if res is not None:
                 node, ancestors = res
+                if node == None:
+                    return ancestors
             else:
                 # no possible actions at this point, but later we need to
                 # think about how to deal with this case
                 break
             node.reward, move_sequence = self._roll_out(node, ancestors)
-            # when a solution is found in rollout...
-            if node.reward == self.max_depth:
-                while node.parent is not None:
-                    move_sequence.append(((node.pos), node.action))
-                    node = node.parent
-                print("rollout found to be a sol'n.")
-                return move_sequence
             self.backup(node)
 
         best_child = sorted(self.root.children, key=lambda e: e.visited, reverse=True)[0]
@@ -83,7 +78,7 @@ class MCTS():
 
     def _get_next_node(self, node):
         ancestors = []
-        while node.depth < self.max_depth:
+        while True:
             untried_nodes = node.untried_nodes()
             if len(untried_nodes) > 0:
                 untried = random.choice(untried_nodes)
@@ -98,6 +93,8 @@ class MCTS():
                 if len(node.children) == 0:
                     new_constraints = self._update_constraints(ancestors)
                     explored = self._update_explored(ancestors)
+                    if np.count_nonzero(explored) == self.sudoku_size ** 2:
+                        return None, ancestors
                     search_order = self._get_search_order(new_constraints, explored)
                     all_minimum = self._get_all_minimum(search_order)
                     pos, possible_values = random.choice(all_minimum)
@@ -155,7 +152,7 @@ class MCTS():
                 break
             else:
                 node = Node(node, random.choice(list(actions)), pos)
-        self.print_rollout(move_sequence, ancestors)
+        #self.print_rollout(move_sequence, ancestors)
         assert depth == len(move_sequence)+len(ancestors)+ self.root.depth
         return depth, move_sequence
 
