@@ -1,6 +1,7 @@
 import random
 import numpy as np
 import copy
+import collections
 
 
 class MCTS():
@@ -9,14 +10,15 @@ class MCTS():
     tree policy, a default policy, and a backup strategy.
     See e.g. Browne et al. (2012) for a survey on monte carlo tree search
     """
-    def __init__(self, sudoku_size, ucb1_confidence=1.41, tree_policy="UCB1"):
+    def __init__(self, model, sudoku_size, ucb1_confidence=1.41, tree_policy="UCB1"):
         self.sudoku_size = sudoku_size
         self.max_depth = self.sudoku_size ** 2
         self.tree_policy = tree_policy
         self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
         self.ucb1_confidence = ucb1_confidence
-        self.root = Node(parent=None, action=None, pos="root")
-        self.root.depth = -1
+        self.orig_root = Node(parent=None, action=None, pos="root")
+        self.root = self.orig_root
+
 
     def __call__(self, sudoku_state, n=1500):
         """
@@ -256,6 +258,17 @@ class MCTS():
         return new_explored
 
 
+    def tree_traversal(self):
+        visited, queue = set(), collections.deque([self.root])
+        while queue:
+            vertex = queue.popleft()
+            for child in vertex.children:
+                visited.add(child)
+                queue.append(child)
+        print(len(visited))
+        return visited
+
+
 class Node():
     """
     A node holding a state in the tree.
@@ -268,6 +281,7 @@ class Node():
         self.score = 0
         self.reward = 0
         self.pos = pos
+        self.prior = 0
 
         if self.parent is not None:
             self.depth = parent.depth + 1

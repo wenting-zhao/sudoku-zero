@@ -47,6 +47,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             # mcts = MCTS()
             # TODO: MCTS Logic
             # You could pass the model as an argument into the MCTS class, and use model.predict to get the prediction given by NN
+            data = run_mcts(model, n=100)
 
             # TODO: Collect the data
             # Dataformat: (history, label_prob_distibution, reward)
@@ -58,6 +59,24 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             
         except Exception as e:
             print (str(e))
+
+def run_mcts(model, n):
+    mcts = MCTS(sudoku_size=16, ucb1_confidence=16, tree_policy="UCB1")
+    trajectory = []
+    while 0 in sudoku[:, :]:
+        res = mcts(sudoku, n)
+        if res[0][1] == "unsatisfiable":
+            return None
+
+        for move in res:
+            (x, y), action = move
+            sudoku[x, y] = action
+            trajectory.append(move)
+
+        if len(res) > 1:
+            break
+
+    return trajectory
 
 def slave():
     BaseManager.register("get_history_queue")
