@@ -65,8 +65,8 @@ class MCTS():
         return [(best_child.pos, best_child.action)]
 
     def _best_child(self, node):
-        most_promising_node = 0
-        most_promising = 0
+        most_promising_node = None
+        most_promising = float("-inf")
         #deepest_node = 0
         #deepest = 0
         for child in node.children:
