@@ -48,7 +48,7 @@ class MCTS():
             res = self._get_next_node(self.root)
             if res is not None:
                 node, ancestors = res
-                if node == None:
+                if node is None:
                     return ancestors
             else:
                 # no possible actions at this point, but later we need to
@@ -62,8 +62,8 @@ class MCTS():
         return [(best_child.pos, best_child.action)]
 
     def _best_child(self, node):
-        most_promising_node = 0
-        most_promising = 0
+        most_promising_node = None
+        most_promising = float("-inf")
         #deepest_node = 0
         #deepest = 0
         for child in node.children:
