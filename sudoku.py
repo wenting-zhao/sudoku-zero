@@ -65,7 +65,7 @@ def main():
     #update_sudoku(sudoku)
     mcts = MCTS(sudoku_size=n, ucb1_confidence=c_map[n], tree_policy="UCB1")
     while 0 in sudoku[:, :]:
-        res = mcts(sudoku, n=10000)
+        res = mcts(sudoku, n=100)
         # since a solution can be found during rollout,
         # res can be more than one best action.
         for move in res:

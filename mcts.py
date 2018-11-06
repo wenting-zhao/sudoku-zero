@@ -50,7 +50,11 @@ class MCTS():
                 # no possible actions at this point, but later we need to
                 # think about how to deal with this case
                 break
-            node.reward, move_sequence = self._roll_out(node, ancestors)
+            reward = []
+            for _ in range(100):
+                depth, move_sequence = self._roll_out(node, ancestors)
+                reward.append(depth)
+            node.reward = np.mean(reward)
             # when a solution is found in rollout...
             if node.reward == self.max_depth:
                 while node.parent is not None:
@@ -98,6 +102,8 @@ class MCTS():
                 if len(node.children) == 0:
                     new_constraints = self._update_constraints(ancestors)
                     explored = self._update_explored(ancestors)
+                    if np.count_nonzero(explored) == self.sudoku_size ** 2:
+                        return None, ancestors
                     search_order = self._get_search_order(new_constraints, explored)
                     all_minimum = self._get_all_minimum(search_order)
                     pos, possible_values = random.choice(all_minimum)
