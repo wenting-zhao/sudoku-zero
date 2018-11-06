@@ -56,7 +56,7 @@ class MCTS():
                 reward.append(depth)
             node.reward = np.mean(reward)
             # when a solution is found in rollout...
-            if node.reward == self.max_depth:
+            if max(reward) == self.max_depth:
                 while node.parent is not None:
                     move_sequence.append(((node.pos), node.action))
                     node = node.parent
