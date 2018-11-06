@@ -38,7 +38,7 @@ class MCTS():
             pos, action = self.search_order[0][0], self.search_order[0][1].pop()
             distribution = [0] * self.sudoku_size
             distribution[action-1] = 1
-            return [(pos, action, [0] * self.sudoku_size)]
+            return [(pos, action, distribution)]
 
         if self.root.pos == "root":
             all_minimum = self._get_all_minimum(self.search_order)
