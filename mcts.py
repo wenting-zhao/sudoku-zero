@@ -55,16 +55,21 @@ class MCTS():
                 # think about how to deal with this case
                 break
             reward = []
+            one_path = []
             for _ in range(10):
-                depth, move_sequence = self._roll_out(node, ancestors)
+                depth, one_path = self._roll_out(node, ancestors)
                 reward.append(depth)
+                if depth == self.max_depth:
+                    move_sequence = one_path
             node.reward = np.mean(reward)
             # when a solution is found in rollout...
             if max(reward) == self.max_depth:
                 while node.parent is not None:
+                    node.visited += 1
                     move_sequence.append(((node.pos), node.action, self._compute_softmax(node.parent)))
+                    node.visited -= 1
                     node = node.parent
-                print("rollout found to be a sol'n.")
+                #print("rollout found to be a sol'n.")
                 return move_sequence
             self.backup(node)
 
@@ -77,8 +82,15 @@ class MCTS():
         x = [0] * self.sudoku_size
         for child in node.children:
             x[child.action-1] = child.visited
-        e_x = np.exp(x - np.max(x))
-        return e_x / e_x.sum()
+        refined_x = [i for i in x if i > 0]
+        e_x = np.exp(refined_x - np.max(refined_x))
+        refined_x = e_x / e_x.sum()
+        idx = 0
+        for i in range(len(x)):
+            if x[i] > 0:
+                x[i] = refined_x[idx]
+                idx += 1
+        return x
 
     def _best_child(self, node):
         most_promising_node = None
@@ -143,7 +155,9 @@ class MCTS():
         # make sure we make the right initial depth
         assert depth == len(ancestors) + self.root.depth
         # record move sequence in case this rollout find a sol'n
+        node.visited += 1  # to calc softmax...
         move_sequence = [(node.pos, node.action, self._compute_softmax(node.parent))]
+        node.visited -= 1
         new_constraints = self._update_constraints(ancestors)
         new_explored = self._update_explored(ancestors)
         cell_possible_actions = self._get_search_order(new_constraints, new_explored)
