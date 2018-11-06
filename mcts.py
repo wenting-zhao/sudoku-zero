@@ -55,14 +55,14 @@ class MCTS():
                 # think about how to deal with this case
                 break
             reward = []
-            for _ in range(100):
+            for _ in range(10):
                 depth, move_sequence = self._roll_out(node, ancestors)
                 reward.append(depth)
             node.reward = np.mean(reward)
             # when a solution is found in rollout...
             if max(reward) == self.max_depth:
                 while node.parent is not None:
-                    move_sequence.append(((node.pos), node.action))
+                    move_sequence.append(((node.pos), node.action, self._compute_softmax(node.parent)))
                     node = node.parent
                 print("rollout found to be a sol'n.")
                 return move_sequence
@@ -110,7 +110,7 @@ class MCTS():
                 if len(node.children) == 0:
                     return None
                 node = self._best_child(node)
-                ancestors.append(((node.pos), node.action))
+                ancestors.append(((node.pos), node.action, self._compute_softmax(node.parent)))
                 if len(node.children) == 0:
                     new_constraints = self._update_constraints(ancestors)
                     explored = self._update_explored(ancestors)
@@ -126,7 +126,7 @@ class MCTS():
     def _update_constraints(self, additional_nodes):
         new_constraints = copy.deepcopy(self.constraints)
         for node in additional_nodes:
-            (x, y), action = node
+            (x, y), action = node[:2]
             try:
                 new_constraints[x].remove(action)
                 new_constraints[y+self.sudoku_size].remove(action)
@@ -143,14 +143,13 @@ class MCTS():
         # make sure we make the right initial depth
         assert depth == len(ancestors) + self.root.depth
         # record move sequence in case this rollout find a sol'n
-        move_sequence = []
+        move_sequence = [(node.pos, node.action, self._compute_softmax(node.parent))]
         new_constraints = self._update_constraints(ancestors)
         new_explored = self._update_explored(ancestors)
         cell_possible_actions = self._get_search_order(new_constraints, new_explored)
         cell_possible_actions = {i[0]: i[1] for i in cell_possible_actions}
         while depth < self.max_depth:
             depth += 1
-            move_sequence.append((node.pos, node.action))
             if len(cell_possible_actions) == 0:
                 break
             for i in range(self.sudoku_size):
@@ -173,14 +172,19 @@ class MCTS():
                 break
             else:
                 node = Node(node, random.choice(list(actions)), pos)
-        self.print_rollout(move_sequence, ancestors)
+                x = [0] * self.sudoku
+                prob = 1/len(actions)
+                for i in actions:
+                    x[i-1] = prob
+                move_sequence.append((node.pos, node.action, x))
+        #self.print_rollout(move_sequence, ancestors)
         assert depth == len(move_sequence)+len(ancestors)+ self.root.depth
         return depth, move_sequence
 
     def print_rollout(self, move_sequence, ancestors):
         rollout = copy.deepcopy(self.sudoku)
         for move in move_sequence+ancestors:
-            (x, y), action = move
+            (x, y), action = move[:2]
             rollout[x, y] = action
         print(rollout)
         print(np.count_nonzero(rollout))
