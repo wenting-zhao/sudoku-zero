@@ -69,8 +69,7 @@ def main():
         # since a solution can be found during rollout,
         # res can be more than one best action.
         for one in res:
-            print(one)
-            (x, y), action, distribution = one
+            (x, y), action = one[:2]
         if len(res) > 1:
             break
         if action == "unsatisfiable":

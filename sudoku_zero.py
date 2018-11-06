@@ -33,7 +33,6 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
 
     all_sudoku = np.load("datasets/complete_16.npy")
 
-    
     while True:
         try:
             with lock:
@@ -42,7 +41,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
 
             start_time = time.time()
             is_print = verbose and game_in_thread % 10 == 0
-            
+
             # Renew the model based on some rules
             model.load_model()
 
@@ -64,7 +63,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
                 # since a solution can be found during rollout,
                 # res can be more than one best action.
                 for one in res:
-                    (x, y), action, _ = one
+                    (x, y), action, _ = one[:2]
                     data.append((copy.deepcopy(sudoku), one))
                     sudoku[x, y] = action
 
@@ -82,7 +81,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             # JUST FOR TEST: Random generate data for test
             data = (np.random.random((9, 9, 10)), np.random.random(82), 10.0)
             queue.put(data)
-            
+
         except Exception as e:
             print (str(e))
 
