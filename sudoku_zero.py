@@ -60,6 +60,11 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             # label_prob_distribution: Softmax of visit number of each node
             while 0 in sudoku[:, :]:
                 res = mcts(sudoku, n=100)
+                if res[0][1] == "unsatisfiable":
+                    # did not find a solution; reward is # of cells it filled
+                    data.append(np.count_nonzero(sudoku))
+                    break
+
                 # since a solution can be found during rollout,
                 # res can be more than one best action.
                 for one in res:
@@ -71,10 +76,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
                     # mcts finished with complete solution, so the reward is max depth
                     data.append(sudoku.size)
                     break
-                if action == "unsatisfiable":
-                    # did not find a solution; reward is # of cells it filled
-                    data.append(np.count_nonzero(sudoku))
-                    break
+
             # add reward when the search finishes
             data.append(sudoku.size)
 
