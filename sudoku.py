@@ -63,13 +63,14 @@ def main():
     c_map = {9: 5, 16: 256}
     sudoku = np.zeros((n, n))
     #update_sudoku(sudoku)
-    mcts = MCTS(sudoku_size=n, ucb1_confidence=c_map[n], tree_policy="UCB1")
+    mcts = MCTS(None, sudoku_size=n, ucb1_confidence=c_map[n], tree_policy="UCB1")
     while 0 in sudoku[:, :]:
         res = mcts(sudoku, n=100)
         # since a solution can be found during rollout,
         # res can be more than one best action.
-        for move in res:
-            (x, y), action = move
+        for one in res:
+            print(one)
+            (x, y), action, distribution = one
         if len(res) > 1:
             break
         if action == "unsatisfiable":

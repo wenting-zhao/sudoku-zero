@@ -1,4 +1,6 @@
 import numpy as np
+import random
+import copy
 import tensorflow as tf
 
 import os
@@ -28,6 +30,9 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
     model.build_model()
 
     game_in_thread = 0
+
+    all_sudoku = np.load("datasets/complete_16.npy")
+
     
     while True:
         try:
@@ -47,10 +52,32 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             # mcts = MCTS()
             # TODO: MCTS Logic
             # You could pass the model as an argument into the MCTS class, and use model.predict to get the prediction given by NN
-
+            mcts = MCTS(model=model, sudoku_size=16, ucb1_confidence=16, tree_policy="UCB1")
+            sudoku = copy.deepcopy(all_sudoku[random.randrange(10000)])
+            update_sudoku(sudoku)
+            data = []
             # TODO: Collect the data
             # Dataformat: (history, label_prob_distibution, reward)
             # label_prob_distribution: Softmax of visit number of each node
+            while 0 in sudoku[:, :]:
+                res = mcts(sudoku, n=100)
+                # since a solution can be found during rollout,
+                # res can be more than one best action.
+                for one in res:
+                    (x, y), action, _ = one
+                    data.append((copy.deepcopy(sudoku), one))
+                    sudoku[x, y] = action
+
+                if len(res) > 1:
+                    # mcts finished with complete solution, so the reward is max depth
+                    data.append(sudoku.size)
+                    break
+                if action == "unsatisfiable":
+                    # did not find a solution; reward is # of cells it filled
+                    data.append(np.count_nonzero(sudoku))
+                    break
+            # add reward when the search finishes
+            data.append(sudoku.size)
 
             # JUST FOR TEST: Random generate data for test
             data = (np.random.random((9, 9, 10)), np.random.random(82), 10.0)
@@ -58,6 +85,11 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             
         except Exception as e:
             print (str(e))
+
+def update_sudoku(sudoku, prob=0.66):
+    for (x, y), _ in np.ndenumerate(sudoku):
+        if whether_remove(prob) is True:
+            sudoku[x, y] = 0
 
 def slave():
     BaseManager.register("get_history_queue")

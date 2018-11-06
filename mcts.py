@@ -9,7 +9,8 @@ class MCTS():
     tree policy, a default policy, and a backup strategy.
     See e.g. Browne et al. (2012) for a survey on monte carlo tree search
     """
-    def __init__(self, sudoku_size, ucb1_confidence=1.41, tree_policy="UCB1"):
+    def __init__(self, model, sudoku_size, ucb1_confidence=1.41, tree_policy="UCB1"):
+        self.model = model
         self.sudoku_size = sudoku_size
         self.max_depth = self.sudoku_size ** 2
         self.tree_policy = tree_policy
@@ -31,10 +32,13 @@ class MCTS():
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
         if len(self.search_order[0][1]) == 0:
-            return [(self.search_order[0][0], "unsatisfiable")]
+            return [(self.search_order[0][0], "unsatisfiable", [0] * self.sudoku_size)]
         elif len(self.search_order[0][1]) == 1:
             #print("Next node is determined without running MCTS.")
-            return [(self.search_order[0][0], self.search_order[0][1].pop())]
+            pos, action = self.search_order[0][0], self.search_order[0][1].pop()
+            distribution = [0] * self.sudoku_size
+            distribution[action-1] = 1
+            return [(pos, action, [0] * self.sudoku_size)]
 
         if self.root.pos == "root":
             all_minimum = self._get_all_minimum(self.search_order)
@@ -66,7 +70,15 @@ class MCTS():
 
         best_child = sorted(self.root.children, key=lambda e: e.visited, reverse=True)[0]
         self.root = best_child
-        return [(best_child.pos, best_child.action)]
+        return [(best_child.pos, best_child.action, self._compute_softmax(best_child.parent))]
+
+    def _compute_softmax(self, node):
+        # note that this is only correct with 1d array
+        x = [0] * self.sudoku_size
+        for child in node.children:
+            x[child.action-1] = child.visited
+        e_x = np.exp(x - np.max(x))
+        return e_x / e_x.sum()
 
     def _best_child(self, node):
         most_promising_node = None
@@ -74,7 +86,7 @@ class MCTS():
         #deepest_node = 0
         #deepest = 0
         for child in node.children:
-            val = self.compute_tree_policy(child)
+            val = self.compute_tree_policy(child, rl=False)
             if val > most_promising:
                 most_promising = val
                 most_promising_node = child
@@ -173,13 +185,19 @@ class MCTS():
         print(rollout)
         print(np.count_nonzero(rollout))
 
-    def compute_tree_policy(self, node):
+    def compute_tree_policy(self, node, rl=False, c=1):
         res = None
         if self.tree_policy == "UCB1":
             res = (node.score +
                 self.ucb1_confidence * np.sqrt(2 * np.log(node.parent.visited) / node.visited))
         elif self.tree_policy == "depth":
             res = node.reward
+
+        if rl:
+            # See details in the alphago zero paper
+            node.prior = self.model.predict(history=None)
+            u = c * (node.prior / (1+node.visited))
+            res += u
         return res
 
     def backup(self, node):
@@ -276,6 +294,7 @@ class Node():
         self.visited = 0
         self.score = 0
         self.reward = 0
+        self.prior = 0
         self.pos = pos
 
         if self.parent is not None:
