@@ -165,7 +165,6 @@ def train(cluster):
         historys = queue.get()
         reward = historys[-1]
         for history in historys[:-1]:
-            print (history)
             state, (label, _, nxt_move) = history
             if n_sample % 1000 == 0:
                 size = train_agent.push_sample(np.array(state), np.array(nxt_move), reward, get_cur_size=True)
