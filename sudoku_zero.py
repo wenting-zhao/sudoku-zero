@@ -80,9 +80,9 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
                     # mcts finished with complete solution, so the reward is max depth
                     data.append(sudoku.size)
                     break
-
-            # add reward when the search finishes
-            data.append(sudoku.size)
+            else:
+                # add reward when the search finishes
+                data.append(sudoku.size)
 
             # JUST FOR TEST: Random generate data for test
             #data = (np.random.random((9, 9, 10)), np.random.random(82), 10.0)
