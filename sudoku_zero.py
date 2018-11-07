@@ -17,6 +17,10 @@ from multiprocessing.managers import BaseManager
 from queue import Queue
 
 from model import model as M
+from mcts import MCTS
+
+def whether_remove(prob):
+    return (True if random.uniform(0, 1) < prob else False)
 
 def meditation(random_state, gpu_id, queue, lock, verbose=True):
     cur_process = current_process()
@@ -68,7 +72,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
                 # since a solution can be found during rollout,
                 # res can be more than one best action.
                 for one in res:
-                    (x, y), action, _ = one[:2]
+                    (x, y), action = one[:2]
                     data.append((copy.deepcopy(sudoku), one))
                     sudoku[x, y] = action
 
@@ -81,7 +85,9 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             data.append(sudoku.size)
 
             # JUST FOR TEST: Random generate data for test
-            data = (np.random.random((9, 9, 10)), np.random.random(82), 10.0)
+            #data = (np.random.random((9, 9, 10)), np.random.random(82), 10.0)
+            # (sudoku, (x, y), action, distribution)
+            # [([n, n], ((x, y), {1--n}, list))]
             queue.put(data)
 
         except Exception as e:
@@ -154,13 +160,18 @@ def train(cluster):
     
     n_sample = 0
     while True:
-        (history, nxt_move, label) = queue.get()
-        if n_sample % 1000 == 0:
-            size = train_agent.push_sample(history, nxt_move, label, get_cur_size=True)
-            print ("Num training sample=%d, tf queue size=%d" % (n_sample, size))
-        else:
-            train_agent.push_sample(history, nxt_move, label)
-        n_sample += 1
+        #(history, nxt_move, label) = queue.get()
+        # Process the data
+        historys = queue.get()
+        reward = historys[-1]
+        for history in historys[:-1]:
+            state, (label, _, nxt_move) = history
+            if n_sample % 1000 == 0:
+                size = train_agent.push_sample(np.array(state), np.array(nxt_move), reward, get_cur_size=True)
+                print ("Num training sample=%d, tf queue size=%d" % (n_sample, size))
+            else:
+                train_agent.push_sample(np.array(state), np.array(nxt_move), reward)
+            n_sample += 1
 
 
 if __name__ == "__main__":
@@ -168,7 +179,7 @@ if __name__ == "__main__":
     argparser.add_argument("--type", type=str)
     argparser.add_argument("--model_path", type=str, default=None)
     argparser.add_argument("--gpu_list", type=str, default="0")
-    argparser.add_argument("--feature_num", type=int, default=10)
+    argparser.add_argument("--feature_num", type=int, default=17)
     argparser.add_argument("--mode", type=str, default="miao")
     argparser.add_argument("--load", type=int, default=0)
     argparser.add_argument("--lr", type=float, default=0.001)
@@ -186,7 +197,7 @@ if __name__ == "__main__":
     argparser.add_argument("--train_gpu", type=str, default='0')
     argparser.add_argument("--filename", type=str, default=None)
     argparser.add_argument("--regularizer", type=bool, default=True)
-    argparser.add_argument("--board_size", type=int, default=9)
+    argparser.add_argument("--board_size", type=int, default=16)
     argparser.add_argument("--save_every", type=int, default=1000)
 
     args = argparser.parse_args()
