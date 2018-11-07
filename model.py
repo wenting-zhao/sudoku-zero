@@ -141,7 +141,6 @@ class model(model_base):
 
     def push_sample(self, features, nxt_move, label, get_cur_size=False):
         features = self._extract_feature(features)
-        print (np.array(features).shape, " ", np.array(nxt_move).shape, " ", np.array(label).shape)
         feed = {self.features: features, self.nxt_move: nxt_move, self.label: label}
         if get_cur_size:
             _, size = self.sess.run([self.feed_step, self.queue_size], feed_dict=feed)
