@@ -186,7 +186,7 @@ class MCTS():
                 break
             else:
                 node = Node(node, random.choice(list(actions)), pos)
-                x = [0] * self.sudoku
+                x = [0] * self.sudoku_size
                 prob = 1/len(actions)
                 for i in actions:
                     x[i-1] = prob
