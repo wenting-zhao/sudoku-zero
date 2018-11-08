@@ -12,11 +12,11 @@ class model_base(object):
         config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
         config.gpu_options.allow_growth=True
         if not gpu_list is None:
+            print ("Visible gpu list: ", str(gpu_list))
             config.gpu_options.visible_device_list = str(gpu_list)
-
         self.graph = tf.Graph()
         self.sess = tf.Session(graph=self.graph, config=config)
-        self.cur_checkpoint="None"
+        self.cur_checkpoint = "None"
 
     def _loss(self, X, y):
         pass
