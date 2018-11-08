@@ -14,7 +14,7 @@ class sudoku_model(model):
 
     def _forward(self, inputs, batch_size, is_train, dev, reuse, regularizer=None, rot_var=None):
         X = inputs
-        n_filter=16
+        n_filter = 16
         n_extra = 8
 
         net = tf.contrib.layers.conv2d(X, n_filter, kernel_size=3, biases_initializer=None, activation_fn=None, scope="input", reuse=reuse, weights_regularizer=regularizer)

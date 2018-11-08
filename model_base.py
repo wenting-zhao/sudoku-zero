@@ -57,12 +57,12 @@ class model_base(object):
             path = self.model_path
         ckpt = tf.train.get_checkpoint_state(path)
         if ckpt and ckpt.model_checkpoint_path:
-            if ckpt.model_checkpoing_path == self.cur_checkpoint:
+            if ckpt.model_checkpoint_path == self.cur_checkpoint:
                 print ("Do not load the same model %s again" % (ckpt.model_checkpoint_path))
             else:
-                print ("Load model from %s" % (ckpt.model_checkpoing_path))
+                print ("Load model from %s" % (ckpt.model_checkpoint_path))
                 self.saver.restore(self.sess, ckpt.model_checkpoint_path)
-                self.cur_checkpoing = str(ckpt.model_checkpoint_path)
+                self.cur_checkpoint = str(ckpt.model_checkpoint_path)
             return True
         else:
             pass
