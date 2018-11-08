@@ -29,6 +29,8 @@ class model_base(object):
         for grad_and_vars in zip(*tower_grads):
             grads = []
             for g, _ in grad_and_vars:
+                if g is None:
+                    continue
                 expanded_g = tf.expand_dims(g, 0)
                 grads.append(expanded_g)
 

@@ -18,7 +18,8 @@ class model(model_base):
         self.args = args
 
     def _loss(self, logit, value, nxt_move, label, prob, regularizer):
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logit, labels=nxt_move)
+        #cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logit, labels=nxt_move)
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=nxt_move, logits=logit)
         cross_entropy_mean = tf.reduce_mean(cross_entropy)
 
         v_diff = tf.squared_difference(value, label)
@@ -109,8 +110,8 @@ class model(model_base):
 
                 for i, cur_gpu in enumerate(self.gpu_list):
                     cur_gpu = int(cur_gpu)
-                    print (cur_gpu)
-                    with tf.device('/gpu:%d' % cur_gpu):
+                    print ("Build graph on GPU: ", cur_gpu)
+                    with tf.device('/device:GPU:%d' % cur_gpu):
                         with tf.name_scope('tower_%d' % cur_gpu) as scope:
                             gpu_batch_size = batch_size / n_gpu # This should be diveded 
                             regularizer = tf.contrib.layers.l2_regularizer(self.args.l2)
@@ -123,6 +124,8 @@ class model(model_base):
                             ce, mse, reg, loss, kl = self._loss(logit, v, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
 
                             grads = optimizer.compute_gradients(loss)
+                            if grads is None:
+                                print (i)
                             tower_grads.append(grads)
                             tower_loss.append(loss)
                             tower_ce.append(ce)
