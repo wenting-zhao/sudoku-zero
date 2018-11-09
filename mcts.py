@@ -62,6 +62,7 @@ class MCTS():
                 if depth == self.max_depth:
                     move_sequence = one_path
             node.reward = np.mean(reward)
+            return_reward = node.reward
             # when a solution is found in rollout...
             if max(reward) == self.max_depth:
                 while node.parent is not None:
@@ -70,7 +71,7 @@ class MCTS():
                     node.visited -= 1
                     node = node.parent
                 #print("rollout found to be a sol'n.")
-                return move_sequence + [node.reward]
+                return move_sequence + [return_reward]
             self.backup(node)
 
         best_child = sorted(self.root.children, key=lambda e: e.visited, reverse=True)[0]
