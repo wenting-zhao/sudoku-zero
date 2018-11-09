@@ -18,7 +18,8 @@ class model(model_base):
         self.args = args
 
     def _loss(self, logit, value, nxt_move, label, prob, regularizer):
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logit, labels=nxt_move)
+        #cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logit, labels=nxt_move)
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=nxt_move, logits=logit)
         cross_entropy_mean = tf.reduce_mean(cross_entropy)
 
         v_diff = tf.squared_difference(value, label)
@@ -33,12 +34,14 @@ class model(model_base):
 
         return cross_entropy_mean, v_loss, reg_term, v_loss + cross_entropy_mean + reg_term, kl_mean
 
-    def _extract_feature(self, history):
+    def _extract_feature(self, history, pos):
         # TODO:
+        X, Y = pos[0], pos[1]
         n_board = history.shape[0]
-        ret = np.zeros((n_board, n_board, n_board + 1))
+        ret = np.zeros((n_board, n_board, n_board + 2))
         for (x, y) in zip(range(n_board), range(n_board)):
             ret[x, y, history[x, y]] = 1.0
+        ret[X, Y, n_board + 1] = 1.0
         return ret
 
     def preprocess(self):
@@ -52,14 +55,15 @@ class model(model_base):
                 #features, search_prob = self._extract_feature(history)
                 #features, search_prob = history, history
                 features = self.features = _placeholder(shape=[self.args.board_size, self.args.board_size, self.args.feature_num], name="features")
+                pos = self.pos = _placeholder(shape=[2], dtype=np.int32, name="input_position")
                 # TODO: remove search prob
                 search_prob = features
 
                 self.sample_buffer = sample_buffer = tf.RandomShuffleQueue(capacity=self.args.buffer_size, min_after_dequeue=self.args.min_buffer_size, 
-                                                                            shapes=[[self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size], []], 
-                                                                            dtypes=[tf.float32, tf.float32, tf.float32])
+                                                                            shapes=[[self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size], [], [2]], 
+                                                                            dtypes=[tf.float32, tf.float32, tf.float32, tf.int32])
 
-                self.feed_step = sample_buffer.enqueue((features, nxt_move, label))
+                self.feed_step = sample_buffer.enqueue((features, nxt_move, label, pos))
                 self.queue_size = sample_buffer.size()
             else:
                 if self.mode == "predict":
@@ -91,7 +95,7 @@ class model(model_base):
 
                 optimizer = tf.train.MomentumOptimizer(learning_rate=lr, momentum=0.9)
 
-                X, nxt_move, label = self.sample_buffer.dequeue_many(batch_size)
+                X, nxt_move, label, pos = self.sample_buffer.dequeue_many(batch_size)
                 n_gpu = len(self.gpu_list)
                 batch_X  = tf.split(X, n_gpu)
                 batch_nm = tf.split(nxt_move, n_gpu)
@@ -100,10 +104,14 @@ class model(model_base):
                 tower_grads = []
                 tower_loss  = []
                 tower_prob  = []
+                tower_ce    = []
+                tower_mse   = []
+                tower_reg   = []
 
                 for i, cur_gpu in enumerate(self.gpu_list):
                     cur_gpu = int(cur_gpu)
-                    with tf.device('/gpu:%d' % cur_gpu):
+                    print ("Build graph on GPU: ", cur_gpu)
+                    with tf.device('/device:GPU:%d' % cur_gpu):
                         with tf.name_scope('tower_%d' % cur_gpu) as scope:
                             gpu_batch_size = batch_size / n_gpu # This should be diveded 
                             regularizer = tf.contrib.layers.l2_regularizer(self.args.l2)
@@ -116,8 +124,13 @@ class model(model_base):
                             ce, mse, reg, loss, kl = self._loss(logit, v, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
 
                             grads = optimizer.compute_gradients(loss)
+                            if grads is None:
+                                print (i)
                             tower_grads.append(grads)
                             tower_loss.append(loss)
+                            tower_ce.append(ce)
+                            tower_mse.append(mse)
+                            tower_reg.append(reg)
 
                             tf.summary.scalar('/gpu:%d/mse'%i, mse)
                             tf.summary.scalar('/gpu:%d/ce'%i,ce)
@@ -130,6 +143,9 @@ class model(model_base):
                 apply_gradient_op = optimizer.apply_gradients(grads, global_step=self.global_step)
                 self.train_step = apply_gradient_op
                 self.loss = tf.reduce_mean(tower_loss)
+                self.ce   = tf.reduce_mean(tower_ce)
+                self.mse  = tf.reduce_mean(tower_mse)
+                self.reg  = tf.reduce_mean(reg)
 
                 tf.summary.scalar("lr", lr)
                 self.summary_step = tf.summary.merge_all()
@@ -139,9 +155,9 @@ class model(model_base):
             self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=50)
             self.all_var = tf.global_variables()
 
-    def push_sample(self, features, nxt_move, label, get_cur_size=False):
-        features = self._extract_feature(features)
-        feed = {self.features: features, self.nxt_move: nxt_move, self.label: label}
+    def push_sample(self, features, nxt_move, label, pos, get_cur_size=False):
+        features = self._extract_feature(features, pos)
+        feed = {self.features: features, self.nxt_move: nxt_move, self.label: label, self.pos: pos}
         if get_cur_size:
             _, size = self.sess.run([self.feed_step, self.queue_size], feed_dict=feed)
             return size
@@ -152,7 +168,7 @@ class model(model_base):
         start_time = time.time()
         for _ in range(print_step - 1):
             self.sess.run(self.train_step)
-        _, loss, summary = self.sess.run([self.train_step, self.loss, self.summary_step])
+        _, loss, ce, mse, reg, summary = self.sess.run([self.train_step, self.loss, self.ce, self.mse, self.reg, self.summary_step])
         global_step = self.sess.run(self.global_step)
         summary_writer.add_summary(summary, global_step)
 
@@ -160,8 +176,8 @@ class model(model_base):
         num_sample_per_step = self.batch_size
         sample_per_sec = num_sample_per_step  * print_step / duration
         sec_per_batch = duration / print_step
-        format_str = ("global step %d loss %.3f; %.1f samples/sec; %.3f sec/batch")
-        print (format_str % (global_step, loss, sample_per_sec, sec_per_batch))
+        format_str = ("global step %d loss %.3f; ce %.3f; mse %.3f; reg %.3f; %.1f samples/sec; %.3f sec/batch")
+        print (format_str % (global_step, loss, ce, mse, reg, sample_per_sec, sec_per_batch))
         sys.stdout.flush()
 
     def get_step(self):

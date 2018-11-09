@@ -149,10 +149,7 @@ def train(cluster):
     #train_agent = M(args, mode="train", gpu_list=args.train_gpu)
     train_agent.preprocess()
     train_agent.build_model()
-    if args.load:
-        train_agent.load_model()
-    else:
-        print ("Train from scratch!")
+    train_agent.load_model()
     
     train_thread = threading.Thread(target=train_worker, args=[train_agent])
     train_thread.daemon = True
@@ -163,14 +160,14 @@ def train(cluster):
         #(history, nxt_move, label) = queue.get()
         # Process the data
         historys = queue.get()
-        reward = historys[-1]
+        reward = float(historys[-1]) / 256.0
         for history in historys[:-1]:
-            state, (label, _, nxt_move) = history
+            state, (pos, _, nxt_move) = history
             if n_sample % 1000 == 0:
-                size = train_agent.push_sample(np.array(state), np.array(nxt_move), reward, get_cur_size=True)
+                size = train_agent.push_sample(np.array(state), np.array(nxt_move), reward, np.array(pos), get_cur_size=True)
                 print ("Num training sample=%d, tf queue size=%d" % (n_sample, size))
             else:
-                train_agent.push_sample(np.array(state), np.array(nxt_move), reward)
+                train_agent.push_sample(np.array(state), np.array(nxt_move), reward, np.array(pos))
             n_sample += 1
 
 
@@ -179,11 +176,11 @@ if __name__ == "__main__":
     argparser.add_argument("--type", type=str)
     argparser.add_argument("--model_path", type=str, default=None)
     argparser.add_argument("--gpu_list", type=str, default="0")
-    argparser.add_argument("--feature_num", type=int, default=17)
+    argparser.add_argument("--feature_num", type=int, default=18)
     argparser.add_argument("--mode", type=str, default="miao")
     argparser.add_argument("--load", type=int, default=0)
-    argparser.add_argument("--lr", type=float, default=0.001)
-    argparser.add_argument("--l2", type=float, default=0.000001)
+    argparser.add_argument("--lr", type=float, default=0.0001)
+    argparser.add_argument("--l2", type=float, default=0.0001)
 
     argparser.add_argument("--port", type=int, default="12345")
     argparser.add_argument("--host", type=str, default="localhost")

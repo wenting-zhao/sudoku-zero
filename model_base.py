@@ -12,11 +12,11 @@ class model_base(object):
         config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
         config.gpu_options.allow_growth=True
         if not gpu_list is None:
+            print ("Visible gpu list: ", str(gpu_list))
             config.gpu_options.visible_device_list = str(gpu_list)
-
         self.graph = tf.Graph()
         self.sess = tf.Session(graph=self.graph, config=config)
-        self.cur_checkpoint="None"
+        self.cur_checkpoint = "None"
 
     def _loss(self, X, y):
         pass
@@ -29,6 +29,8 @@ class model_base(object):
         for grad_and_vars in zip(*tower_grads):
             grads = []
             for g, _ in grad_and_vars:
+                if g is None:
+                    continue
                 expanded_g = tf.expand_dims(g, 0)
                 grads.append(expanded_g)
 
@@ -57,12 +59,12 @@ class model_base(object):
             path = self.model_path
         ckpt = tf.train.get_checkpoint_state(path)
         if ckpt and ckpt.model_checkpoint_path:
-            if ckpt.model_checkpoing_path == self.cur_checkpoint:
+            if ckpt.model_checkpoint_path == self.cur_checkpoint:
                 print ("Do not load the same model %s again" % (ckpt.model_checkpoint_path))
             else:
-                print ("Load model from %s" % (ckpt.model_checkpoing_path))
+                print ("Load model from %s" % (ckpt.model_checkpoint_path))
                 self.saver.restore(self.sess, ckpt.model_checkpoint_path)
-                self.cur_checkpoing = str(ckpt.model_checkpoint_path)
+                self.cur_checkpoint = str(ckpt.model_checkpoint_path)
             return True
         else:
             pass
