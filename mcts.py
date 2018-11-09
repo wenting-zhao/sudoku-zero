@@ -38,7 +38,7 @@ class MCTS():
             pos, action = self.search_order[0][0], self.search_order[0][1].pop()
             distribution = [0] * self.sudoku_size
             distribution[action-1] = 1
-            return [(pos, action, distribution)]
+            return [(pos, action, distribution), None]
 
         if self.root.pos == "root":
             all_minimum = self._get_all_minimum(self.search_order)
@@ -70,12 +70,12 @@ class MCTS():
                     node.visited -= 1
                     node = node.parent
                 #print("rollout found to be a sol'n.")
-                return move_sequence
+                return move_sequence + [node.reward]
             self.backup(node)
 
         best_child = sorted(self.root.children, key=lambda e: e.visited, reverse=True)[0]
         self.root = best_child
-        return [(best_child.pos, best_child.action, self._compute_softmax(best_child.parent))]
+        return [(best_child.pos, best_child.action, self._compute_softmax(best_child.parent)), None]
 
     def _compute_softmax(self, node):
         # note that this is only correct with 1d array

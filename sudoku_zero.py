@@ -66,19 +66,19 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
                 res = mcts(sudoku, n=100)
                 if res[0][1] == "unsatisfiable":
                     # did not find a solution; reward is # of cells it filled
-                    data.append(np.count_nonzero(sudoku))
+                    data.append(0)
                     break
 
                 # since a solution can be found during rollout,
                 # res can be more than one best action.
-                for one in res:
+                for one in res[:-1]:
                     (x, y), action = one[:2]
                     data.append((copy.deepcopy(sudoku), one))
                     sudoku[x, y] = action
 
-                if len(res) > 1:
+                if len(res) > 2:
                     # mcts finished with complete solution, so the reward is max depth
-                    data.append(sudoku.size)
+                    data.append(res[-1])
                     break
             else:
                 # add reward when the search finishes
