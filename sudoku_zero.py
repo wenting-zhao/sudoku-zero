@@ -55,34 +55,13 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             # mcts = MCTS()
             # TODO: MCTS Logic
             # You could pass the model as an argument into the MCTS class, and use model.predict to get the prediction given by NN
-            mcts = MCTS(model=model, sudoku_size=16, ucb1_confidence=16, tree_policy="UCB1")
+            mcts = MCTS(model=model, rollout=100, sudoku_size=16, ucb1_confidence=1, tree_policy="UCB1")
             sudoku = copy.deepcopy(all_sudoku[random.randrange(10000)])
             update_sudoku(sudoku)
-            data = []
-            # TODO: Collect the data
-            # Dataformat: (history, label_prob_distibution, reward)
-            # label_prob_distribution: Softmax of visit number of each node
-            while 0 in sudoku[:, :]:
-                res = mcts(sudoku, n=100)
-                if res[0][1] == "unsatisfiable":
-                    # did not find a solution; reward is # of cells it filled
-                    data.append(0)
-                    break
-
-                # since a solution can be found during rollout,
-                # res can be more than one best action.
-                for one in res[:-1]:
-                    (x, y), action = one[:2]
-                    data.append((copy.deepcopy(sudoku), one))
-                    sudoku[x, y] = action
-
-                if len(res) > 2:
-                    # mcts finished with complete solution, so the reward is max depth
-                    data.append(res[-1])
-                    break
-            else:
-                # add reward when the search finishes
-                data.append(sudoku.size)
+            data = None
+            for _ in range(100):
+                res = mcts(sudoku, n=100000)
+                data.append(res)
 
             # JUST FOR TEST: Random generate data for test
             #data = (np.random.random((9, 9, 10)), np.random.random(82), 10.0)

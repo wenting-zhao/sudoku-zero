@@ -9,17 +9,17 @@ class MCTS():
     tree policy, a default policy, and a backup strategy.
     See e.g. Browne et al. (2012) for a survey on monte carlo tree search
     """
-    def __init__(self, model, sudoku_size, ucb1_confidence=1.41, tree_policy="UCB1"):
+    def __init__(self, model, sudoku_size, rollout=10, ucb1_confidence=1.41, tree_policy="UCB1"):
         self.model = model
         self.sudoku_size = sudoku_size
+        self.rollout = rollout
         self.max_depth = self.sudoku_size ** 2
         self.tree_policy = tree_policy
         self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
         self.ucb1_confidence = ucb1_confidence
         self.root = Node(parent=None, action=None, pos="root")
-        self.root.depth = -1
 
-    def __call__(self, sudoku_state, n=1500):
+    def __call__(self, sudoku_state, n=10000):
         """
         Run the monte carlo tree search.
 
@@ -31,52 +31,52 @@ class MCTS():
         self.constraints = self._get_constraints(sudoku_state)
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
-        if len(self.search_order[0][1]) == 0:
-            return [(self.search_order[0][0], "unsatisfiable", [0] * self.sudoku_size)]
-        elif len(self.search_order[0][1]) == 1:
-            #print("Next node is determined without running MCTS.")
-            pos, action = self.search_order[0][0], self.search_order[0][1].pop()
-            distribution = [0] * self.sudoku_size
-            distribution[action-1] = 1
-            return [(pos, action, distribution), None]
+        all_minimum = self._get_all_minimum(self.search_order)
+        pos, possible_values = random.choice(all_minimum)
+        self.root.depth = np.count_nonzero(self.explored_nodes) - 1
+        self._create_leaves(self.root, pos, possible_values)
 
-        if self.root.pos == "root":
-            all_minimum = self._get_all_minimum(self.search_order)
-            pos, possible_values = random.choice(all_minimum)
-            self.root.depth = np.count_nonzero(self.explored_nodes) - 1
-            self._create_leaves(self.root, pos, possible_values)
-
-        for _ in range(n):
+        for i in range(n):
             res = self._get_next_node(self.root)
-            if res is not None:
-                node, ancestors = res
+            if res[0] == "unsat":
+                node.reward = 0
+                self.backup(node)
+                continue 
             else:
-                # no possible actions at this point, but later we need to
-                # think about how to deal with this case
-                break
+                node, ancestors = res              
             reward = []
-            one_path = []
-            for _ in range(10):
-                depth, one_path = self._roll_out(node, ancestors)
-                reward.append(depth)
+            if_found = False
+            for _ in range(self.rollout):
+                depth, _ = self._roll_out(node, ancestors)
                 if depth == self.max_depth:
-                    move_sequence = one_path
-            node.reward = np.mean(reward)
-            return_reward = node.reward
-            # when a solution is found in rollout...
-            if max(reward) == self.max_depth:
-                while node.parent is not None:
-                    node.visited += 1
-                    move_sequence.append(((node.pos), node.action, self._compute_softmax(node.parent)))
-                    node.visited -= 1
-                    node = node.parent
-                #print("rollout found to be a sol'n.")
-                return move_sequence + [return_reward]
+                    if_found = True
+                reward.append(depth / self.max_depth)
+            node.reward = max(reward)
+            if if_found:
+                return self._get_search_info(ancestors), i
             self.backup(node)
 
-        best_child = sorted(self.root.children, key=lambda e: e.visited, reverse=True)[0]
-        self.root = best_child
-        return [(best_child.pos, best_child.action, self._compute_softmax(best_child.parent)), None]
+    def _get_search_info(self, ancestors):
+        search_info = []
+        cell_possible_actions = {i[0]: i[1] for i in self.search_order}
+        for (pos, action) in ancestors:
+            search_order = sorted(cell_possible_actions.items(), key=lambda kv: len(kv[1]))
+            all_minimum = self._get_all_minimum(search_order)
+            search_info.append((copy.deepcopy(all_minimum), pos))
+            for i in range(self.sudoku_size):
+                if (i, pos[1]) in cell_possible_actions:
+                    if action in cell_possible_actions[(i, pos[1])]:
+                        cell_possible_actions[(i, pos[1])].remove(action)
+            for j in range(self.sudoku_size):
+                if (pos[0], j) in cell_possible_actions:
+                    if action in cell_possible_actions[(pos[0], j)]:
+                        cell_possible_actions[(pos[0], j)].remove(action)
+            for (i, j) in self.box_group[self.which_group[pos]]:
+                if (i, j) in cell_possible_actions:
+                    if action in cell_possible_actions[(i, j)]:
+                        cell_possible_actions[(i, j)].remove(action)
+            del cell_possible_actions[pos]
+        return search_info
 
     def _compute_softmax(self, node):
         # note that this is only correct with 1d array
@@ -98,17 +98,14 @@ class MCTS():
         most_promising = float("-inf")
         #deepest_node = 0
         #deepest = 0
-        for child in node.children:
-            val = self.compute_tree_policy(child, rl=False)
-            if val > most_promising:
-                most_promising = val
-                most_promising_node = child
-            #if child.depth > deepest:
-            #    deepest = child.depth
-            #    deepest_node = child
-            #if most_promising_node.action != deepest_node.action:
-            #    print("deepest node isn't most promising node.")
-        return most_promising_node
+        x = np.zeros(len(node.children))
+        children = list(node.children)
+        for i in range(len(children)):
+            x[i] = self.compute_tree_policy(children[i], rl=False)
+        e_x = np.exp(x - np.max(x))
+        distribution = e_x / e_x.sum()
+        res = np.random.choice(children, 1, p=distribution)
+        return res[0]
 
     def _get_next_node(self, node):
         ancestors = []
@@ -121,19 +118,19 @@ class MCTS():
             else:
                 # no possible actions at this point
                 if len(node.children) == 0:
-                    return None
+                    return "unsat", node
                 node = self._best_child(node)
-                ancestors.append(((node.pos), node.action, self._compute_softmax(node.parent)))
+                ancestors.append(((node.pos), node.action))
                 if len(node.children) == 0:
                     new_constraints = self._update_constraints(ancestors)
                     explored = self._update_explored(ancestors)
                     if np.count_nonzero(explored) == self.sudoku_size ** 2:
-                        return None, ancestors
+                        return None, ancestors, search
                     search_order = self._get_search_order(new_constraints, explored)
                     all_minimum = self._get_all_minimum(search_order)
                     pos, possible_values = random.choice(all_minimum)
                     self._create_leaves(node, pos, possible_values)
-        return random.choice(list(node.children)), ancestors
+        return random.choice(list(node.children)), ancestors, search
 
     # compute next level that has fewest available actions
     def _update_constraints(self, additional_nodes):
