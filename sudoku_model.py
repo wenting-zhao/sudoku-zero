@@ -29,11 +29,11 @@ class sudoku_model(model):
         net = tf_utils.resnet_bn_block_normal(net, n_filter, is_train, reuse=reuse, weights_regularizer=regularizer, dev=dev, scope="resnet5")
 
         # Value
-        value = tf_utils.conv_bn_relu(net, 1, 1, scope="value0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
-        value = tf.contrib.layers.flatten(value)
-        value = tf.contrib.layers.fully_connected(value, 256, scope="value1", reuse=reuse, weights_regularizer=regularizer)
-        value = tf.contrib.layers.fully_connected(value, 1, activation_fn=tf.nn.relu, scope="value2", reuse=reuse, weights_regularizer=regularizer)
-        value = tf.squeeze(value, axis=1)
+        #value = tf_utils.conv_bn_relu(net, 1, 1, scope="value0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
+        #value = tf.contrib.layers.flatten(value)
+        #value = tf.contrib.layers.fully_connected(value, 256, scope="value1", reuse=reuse, weights_regularizer=regularizer)
+        #value = tf.contrib.layers.fully_connected(value, 1, activation_fn=tf.nn.relu, scope="value2", reuse=reuse, weights_regularizer=regularizer)
+        #value = tf.squeeze(value, axis=1)
 
         # Policy
         policy = tf_utils.conv_bn_relu(net, 2, 1, scope="policy0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
@@ -41,7 +41,8 @@ class sudoku_model(model):
         logit = tf.contrib.layers.fully_connected(policy, self.args.board_size, scope="policy1", activation_fn=None, reuse=reuse, weights_regularizer=regularizer)
         pred = tf.nn.softmax(logit)
 
-        value = tf.identity(value, "value_output")
+        #value = tf.identity(value, "value_output")
         pred = tf.identity(pred, "policy_output")
-
-        return logit, pred, value
+        
+        return logit, pred
+        #return logit, pred, value

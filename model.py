@@ -33,7 +33,7 @@ class model(model_base):
         kl_divergence = tf.reduce_sum(nxt_move * tf.log((nxt_move + eps) / (prob + eps)), axis=1)
         kl_mean = tf.reduce_mean(kl_divergence)
 
-        return cross_entropy_mean, v_loss, reg_term, v_loss + cross_entropy_mean + reg_term, kl_mean
+        return cross_entropy_mean, v_loss, reg_term, cross_entropy_mean + reg_term, kl_mean
 
     #def _extract_feature(self, history, pos):
     #    # TODO:
@@ -58,18 +58,18 @@ class model(model_base):
             self.global_step = tf.Variable(0, name='steps', trainable=False)
             if self.mode == "train":
                 #history = self.history = _placeholder(tf.string, name="historys")
-                nxt_move = self.nxt_move = _placeholder(shape=[self.args.board_size], name="nxt_move")
+                nxt_move = self.nxt_move = _placeholder(shape=[self.args.board_size * self.args.board_size], name="nxt_move")
                 label = self.label = _placeholder(name="label")
                 # TODO: write extract feature as a tfop 
                 #features, search_prob = self._extract_feature(history)
                 #features, search_prob = history, history
                 features = self.features = _placeholder(shape=[self.args.board_size, self.args.board_size, self.args.feature_num], name="features")
-                pos = self.pos = _placeholder(shape=[2], dtype=np.int32, name="input_position")
+                pos = self.pos = _placeholder(shape=[None, 2], dtype=np.int32, name="input_position")
                 # TODO: remove search prob
                 search_prob = features
 
                 self.sample_buffer = sample_buffer = tf.RandomShuffleQueue(capacity=self.args.buffer_size, min_after_dequeue=self.args.min_buffer_size, 
-                                                                            shapes=[[self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size * self.args.board_size], [], None, 2], 
+                                                                            shapes=[[self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size * self.args.board_size], [], [None, 2], 
                                                                             dtypes=[tf.float32, tf.float32, tf.float32, tf.int32])
 
                 self.feed_step = sample_buffer.enqueue((features, nxt_move, label, pos))
@@ -93,7 +93,7 @@ class model(model_base):
         with self.graph.as_default():
             if self.mode == "predict":
                 with tf.device('/gpu:%s' % self.gpu_list[0]):
-                    logit, _, value = self._forward(self.X, batch_size, False, dev='tower0', reuse=None)
+                    l * self.args.board_sizeogit, _, value = self._forward(self.X, batch_size, False, dev='tower0', reuse=None)
                     prob = tf.nn.softmax(logit)
                     self.prob = tf.identity(prob, "policy_output")
                     self.value = tf.identity(value, "value_output")
@@ -125,12 +125,15 @@ class model(model_base):
                             gpu_batch_size = batch_size / n_gpu # This should be diveded 
                             regularizer = tf.contrib.layers.l2_regularizer(self.args.l2)
                             if i == 0:
-                                logit, prob, v = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=None, regularizer=regularizer)
+                                #logit, prob, v = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=None, regularizer=regularizer)
+                                logit, prob = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=None, regularizer=regularizer)
                             else:
-                                logit, prob, v = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=True, regularizer=regularizer)
+                                #logit, prob, v = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=True, regularizer=regularizer)
+                                logit, prob = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=True, regularizer=regularizer)
 
                             tower_prob.append(prob)
-                            ce, mse, reg, loss, kl = self._loss(logit, v, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
+                            #ce, mse, reg, loss, kl = self._loss(logit, v, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
+                            ce, mse, reg, loss, kl = self._loss(logit, 0, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
 
                             grads = optimizer.compute_gradients(loss)
                             if grads is None:

@@ -143,7 +143,8 @@ def train(cluster):
         for history in historys:
             reward = history[1]
             for i, item in enumerate(history[0]):
-                nxt_move = (item[2][0] - 1) * args.board_size + item[2][1] - 1
+                nxt_move = np.zeros((args.board_size * args.board_size))
+                nxt_move[(item[2][0] - 1) * args.board_size + item[2][1] - 1] = 1.0
                 state = item[0]
                 pos = []
                 pos_value = []
