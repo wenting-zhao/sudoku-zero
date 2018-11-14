@@ -139,9 +139,17 @@ def train(cluster):
         #(history, nxt_move, label) = queue.get()
         # Process the data
         historys = queue.get()
-        reward = float(historys[-1]) / 256.0
-        for history in historys[:-1]:
-            state, (pos, _, nxt_move) = history
+        #reward = float(historys[-1]) / 256.0
+        for history in historys:
+            reward = history[1]
+            for i, item in enumerate(history[0]):
+                nxt_move = (item[2][0] - 1) * args.board_size + item[2][1] - 1
+                state = item[0]
+                pos = []
+                pos_value = []
+                for j, candidata_pos in enumerate(item[1]):
+                    pos.append(candidate_pos[0])
+                    pos_value.append(candidate_pos[1])
             if n_sample % 1000 == 0:
                 size = train_agent.push_sample(np.array(state), np.array(nxt_move), reward, np.array(pos), get_cur_size=True)
                 print ("Num training sample=%d, tf queue size=%d" % (n_sample, size))

@@ -3,6 +3,7 @@ import tensorflow as tf
 import argparse
 import time
 import sys
+import copy
 
 from model_base import model_base
 
@@ -34,14 +35,22 @@ class model(model_base):
 
         return cross_entropy_mean, v_loss, reg_term, v_loss + cross_entropy_mean + reg_term, kl_mean
 
+    #def _extract_feature(self, history, pos):
+    #    # TODO:
+    #    X, Y = pos[0], pos[1]
+    #    n_board = history.shape[0]
+    #    ret = np.zeros((n_board, n_board, n_board + 2))
+    #    for (x, y) in zip(range(n_board), range(n_board)):
+    #        ret[x, y, history[x, y]] = 1.0
+    #    ret[X, Y, n_board + 1] = 1.0
+    #    return ret
+
     def _extract_feature(self, history, pos):
-        # TODO:
-        X, Y = pos[0], pos[1]
         n_board = history.shape[0]
-        ret = np.zeros((n_board, n_board, n_board + 2))
-        for (x, y) in zip(range(n_board), range(n_board)):
-            ret[x, y, history[x, y]] = 1.0
-        ret[X, Y, n_board + 1] = 1.0
+        ret = copy.deepcopy(history)
+        ret = np.concatenate((ret, np.zeros((n_board, n_board))), 2)
+        for (x, y) in pos:
+            ret[x, y, n_board + 1] = 1.0
         return ret
 
     def preprocess(self):
@@ -60,7 +69,7 @@ class model(model_base):
                 search_prob = features
 
                 self.sample_buffer = sample_buffer = tf.RandomShuffleQueue(capacity=self.args.buffer_size, min_after_dequeue=self.args.min_buffer_size, 
-                                                                            shapes=[[self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size], [], [2]], 
+                                                                            shapes=[[self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size * self.args.board_size], [], None, 2], 
                                                                             dtypes=[tf.float32, tf.float32, tf.float32, tf.int32])
 
                 self.feed_step = sample_buffer.enqueue((features, nxt_move, label, pos))
