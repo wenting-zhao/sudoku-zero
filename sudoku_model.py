@@ -38,7 +38,7 @@ class sudoku_model(model):
         # Policy
         policy = tf_utils.conv_bn_relu(net, 2, 1, scope="policy0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
         policy = tf.contrib.layers.flatten(policy)
-        logit = tf.contrib.layers.fully_connected(policy, self.args.board_size, scope="policy1", activation_fn=None, reuse=reuse, weights_regularizer=regularizer)
+        logit = tf.contrib.layers.fully_connected(policy, self.args.board_size * self.args.board_size, scope="policy1", activation_fn=None, reuse=reuse, weights_regularizer=regularizer)
         pred = tf.nn.softmax(logit)
 
         #value = tf.identity(value, "value_output")

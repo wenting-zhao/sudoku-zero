@@ -23,8 +23,8 @@ class model(model_base):
         cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=nxt_move, logits=logit)
         cross_entropy_mean = tf.reduce_mean(cross_entropy)
 
-        v_diff = tf.squared_difference(value, label)
-        v_loss = tf.reduce_mean(v_diff)
+        #v_diff = tf.squared_difference(value, label)
+        #v_loss = tf.reduce_mean(v_diff)
 
         reg_variables_gradients = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
         reg_term = tf.add_n(reg_variables_gradients)
@@ -33,7 +33,8 @@ class model(model_base):
         kl_divergence = tf.reduce_sum(nxt_move * tf.log((nxt_move + eps) / (prob + eps)), axis=1)
         kl_mean = tf.reduce_mean(kl_divergence)
 
-        return cross_entropy_mean, v_loss, reg_term, cross_entropy_mean + reg_term, kl_mean
+        #return cross_entropy_mean, v_loss, reg_term, cross_entropy_mean + reg_term, kl_mean
+        return cross_entropy_mean, 0, reg_term, cross_entropy_mean + reg_term, kl_mean
 
     #def _extract_feature(self, history, pos):
     #    # TODO:
@@ -50,6 +51,8 @@ class model(model_base):
         ret = copy.deepcopy(history)
         ret = np.concatenate((ret, np.zeros((n_board, n_board))), 2)
         for (x, y) in pos:
+            if x == -1 and y == -1:
+                break
             ret[x, y, n_board + 1] = 1.0
         return ret
 
@@ -69,7 +72,7 @@ class model(model_base):
                 search_prob = features
 
                 self.sample_buffer = sample_buffer = tf.RandomShuffleQueue(capacity=self.args.buffer_size, min_after_dequeue=self.args.min_buffer_size, 
-                                                                            shapes=[[self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size * self.args.board_size], [], [None, 2], 
+                                                                            shapes=[[self.args.board_size, self.args.board_size, self.args.feature_num], [self.args.board_size * self.args.board_size], [], [self.args.board_size * self.args.board_size, 2]], 
                                                                             dtypes=[tf.float32, tf.float32, tf.float32, tf.int32])
 
                 self.feed_step = sample_buffer.enqueue((features, nxt_move, label, pos))
@@ -93,10 +96,10 @@ class model(model_base):
         with self.graph.as_default():
             if self.mode == "predict":
                 with tf.device('/gpu:%s' % self.gpu_list[0]):
-                    l * self.args.board_sizeogit, _, value = self._forward(self.X, batch_size, False, dev='tower0', reuse=None)
+                    logit, _ = self._forward(self.X, batch_size, False, dev='tower0', reuse=None)
                     prob = tf.nn.softmax(logit)
                     self.prob = tf.identity(prob, "policy_output")
-                    self.value = tf.identity(value, "value_output")
+                    #self.value = tf.identity(value, "value_output")
             else:
                 #TODO:
                 #lr = tf.train.piecewise_constant()
@@ -150,7 +153,7 @@ class model(model_base):
                             tf.summary.scalar('/gpu:%d/loss'%i,loss)
                             tf.summary.scalar('/gpu:%d/kl'%i,kl)
 
-                self.prob = tf.reshape(tower_prob, [batch_size, board_size])
+                self.prob = tf.reshape(tower_prob, [batch_size, board_size * board_size])
                 grads = self._average_gradients(tower_grads)
                 apply_gradient_op = optimizer.apply_gradients(grads, global_step=self.global_step)
                 self.train_step = apply_gradient_op

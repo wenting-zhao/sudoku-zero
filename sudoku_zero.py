@@ -135,6 +135,9 @@ def train(cluster):
     train_thread.start()
     
     n_sample = 0
+    saved_data = 0
+    total_data = 0
+    variable_order_data = []
     while True:
         #(history, nxt_move, label) = queue.get()
         # Process the data
@@ -151,12 +154,20 @@ def train(cluster):
                 for j, candidata_pos in enumerate(item[1]):
                     pos.append(candidate_pos[0])
                     pos_value.append(candidate_pos[1])
-            if n_sample % 1000 == 0:
-                size = train_agent.push_sample(np.array(state), np.array(nxt_move), reward, np.array(pos), get_cur_size=True)
-                print ("Num training sample=%d, tf queue size=%d" % (n_sample, size))
-            else:
-                train_agent.push_sample(np.array(state), np.array(nxt_move), reward, np.array(pos))
-            n_sample += 1
+                for _ in xrange(args.board_size * args.board_size - len(pos)):
+                    pos.append((-1, -1))
+                variable_order_data.append((np.array(state), np.array(nxt_move), reward, np.array(pos), np.array(pos_value)))
+                if n_sample % 1000 == 0:
+                    size = train_agent.push_sample(np.array(state), np.array(nxt_move), reward, np.array(pos), get_cur_size=True)
+                    print ("Num training sample=%d, tf queue size=%d" % (n_sample, size))
+                else:
+                    train_agent.push_sample(np.array(state), np.array(nxt_move), reward, np.array(pos))
+                n_sample += 1
+                saved_data += 1
+                if saved_data == int(1e7):
+                    total_data += 1
+                    saved_data = 0
+                    np.save("./ining_data_variable_order/train_data_%d" % (total_data), variable_order_data)
 
 
 if __name__ == "__main__":
