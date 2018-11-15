@@ -157,7 +157,7 @@ class MCTS():
         assert depth == len(ancestors) + self.root.depth
         # record move sequence in case this rollout find a sol'n
         node.visited += 1  # to calc softmax...
-        move_sequence = [(node.pos, node.action, self._compute_softmax(node.parent))]
+        move_sequence = [(node.pos, node.action)]
         node.visited -= 1
         new_constraints = self._update_constraints(ancestors)
         new_explored = self._update_explored(ancestors)
@@ -187,11 +187,7 @@ class MCTS():
                 break
             else:
                 node = Node(node, random.choice(list(actions)), pos)
-                x = [0] * self.sudoku_size
-                prob = 1/len(actions)
-                for i in actions:
-                    x[i-1] = prob
-                move_sequence.append((node.pos, node.action, x))
+                move_sequence.append((node.pos, node.action))
         #self.print_rollout(move_sequence, ancestors)
         assert depth == len(move_sequence)+len(ancestors)+self.root.depth
         return depth, move_sequence
