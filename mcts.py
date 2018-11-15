@@ -128,12 +128,12 @@ class MCTS():
                     new_constraints = self._update_constraints(ancestors)
                     explored = self._update_explored(ancestors)
                     if np.count_nonzero(explored) == self.sudoku_size ** 2:
-                        return None, ancestors, search
+                        return None, ancestors
                     search_order = self._get_search_order(new_constraints, explored)
                     all_minimum = self._get_all_minimum(search_order)
                     pos, possible_values = random.choice(all_minimum)
                     self._create_leaves(node, pos, possible_values)
-        return random.choice(list(node.children)), ancestors, search
+        return random.choice(list(node.children)), ancestors
 
     # compute next level that has fewest available actions
     def _update_constraints(self, additional_nodes):
@@ -156,9 +156,7 @@ class MCTS():
         # make sure we make the right initial depth
         assert depth == len(ancestors) + self.root.depth
         # record move sequence in case this rollout find a sol'n
-        node.visited += 1  # to calc softmax...
         move_sequence = [(node.pos, node.action)]
-        node.visited -= 1
         new_constraints = self._update_constraints(ancestors)
         new_explored = self._update_explored(ancestors)
         cell_possible_actions = self._get_search_order(new_constraints, new_explored)
