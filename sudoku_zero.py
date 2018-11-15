@@ -58,7 +58,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             mcts = MCTS(model=model, rollout=100, sudoku_size=16, ucb1_confidence=1, tree_policy="UCB1")
             sudoku = copy.deepcopy(all_sudoku[random.randrange(10000)])
             update_sudoku(sudoku)
-            data = None
+            data = []
             for _ in range(100):
                 res = mcts(sudoku, n=100000)
                 data.append(res)
@@ -167,6 +167,7 @@ def train(cluster):
                 if saved_data == int(1e7):
                     total_data += 1
                     saved_data = 0
+                    variable_order_data = []
                     np.save("./ining_data_variable_order/train_data_%d" % (total_data), variable_order_data)
 
 
