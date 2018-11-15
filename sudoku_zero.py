@@ -59,9 +59,14 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             sudoku = copy.deepcopy(all_sudoku[random.randrange(10000)])
             update_sudoku(sudoku)
             data = []
-            for _ in range(100):
-                res = mcts(sudoku, n=100000)
-                data.append(res)
+            idx = 0
+            while idx < 100:
+                res = mcts(sudoku, n=1000)
+                if res is None:
+                    continue
+                else:
+                    data.append(res)
+                    idx += 1
 
             # JUST FOR TEST: Random generate data for test
             #data = (np.random.random((9, 9, 10)), np.random.random(82), 10.0)

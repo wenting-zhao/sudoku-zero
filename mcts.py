@@ -41,9 +41,9 @@ class MCTS():
             if res[0] == "unsat":
                 node.reward = 0
                 self.backup(node)
-                continue 
+                continue
             else:
-                node, ancestors = res              
+                node, ancestors = res
             reward = []
             if_found = False
             for _ in range(self.rollout):
@@ -55,6 +55,7 @@ class MCTS():
             if if_found:
                 return self._get_search_info(ancestors), i
             self.backup(node)
+        return None
 
     def _get_search_info(self, ancestors):
         search_info = []
@@ -192,7 +193,7 @@ class MCTS():
                     x[i-1] = prob
                 move_sequence.append((node.pos, node.action, x))
         #self.print_rollout(move_sequence, ancestors)
-        assert depth == len(move_sequence)+len(ancestors)+ self.root.depth
+        assert depth == len(move_sequence)+len(ancestors)+self.root.depth
         return depth, move_sequence
 
     def print_rollout(self, move_sequence, ancestors):
@@ -207,7 +208,7 @@ class MCTS():
         res = None
         if self.tree_policy == "UCB1":
             res = (node.score +
-                self.ucb1_confidence * np.sqrt(2 * np.log(node.parent.visited) / node.visited))
+                   self.ucb1_confidence * np.sqrt(2 * np.log(node.parent.visited) / node.visited))
         elif self.tree_policy == "depth":
             res = node.reward
 
