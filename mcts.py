@@ -9,8 +9,9 @@ class MCTS():
     tree policy, a default policy, and a backup strategy.
     See e.g. Browne et al. (2012) for a survey on monte carlo tree search
     """
-    def __init__(self, model, sudoku_size, rollout=10, ucb1_confidence=1.41, tree_policy="UCB1"):
+    def __init__(self, model, sudoku_size, infer=False, rollout=10, ucb1_confidence=1.41, tree_policy="UCB1"):
         self.model = model
+        self.infer = infer
         self.sudoku_size = sudoku_size
         self.rollout = rollout
         self.max_depth = self.sudoku_size ** 2
@@ -32,7 +33,10 @@ class MCTS():
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
         all_minimum = self._get_all_minimum(self.search_order)
-        pos, possible_values = random.choice(all_minimum)
+        if self.infer:
+            self.model.predict(self.sudoku, all_minimum.keys())
+        else:
+            pos, possible_values = random.choice(all_minimum)
         self.root.depth = np.count_nonzero(self.explored_nodes) - 1
         self._create_leaves(self.root, pos, possible_values)
 
@@ -131,7 +135,10 @@ class MCTS():
                         return None, ancestors
                     search_order = self._get_search_order(new_constraints, explored)
                     all_minimum = self._get_all_minimum(search_order)
-                    pos, possible_values = random.choice(all_minimum)
+                    if self.infer:
+                        self.model.predict(new_state(ancestors), all_minimum.keys())
+                    else:
+                        pos, possible_values = random.choice(all_minimum)
                     self._create_leaves(node, pos, possible_values)
         return random.choice(list(node.children)), ancestors
 
@@ -186,17 +193,15 @@ class MCTS():
             else:
                 node = Node(node, random.choice(list(actions)), pos)
                 move_sequence.append((node.pos, node.action))
-        #self.print_rollout(move_sequence, ancestors)
         assert depth == len(move_sequence)+len(ancestors)+self.root.depth
         return depth, move_sequence
 
-    def print_rollout(self, move_sequence, ancestors):
-        rollout = copy.deepcopy(self.sudoku)
-        for move in move_sequence+ancestors:
+    def new_state(self, ancestors):
+        new = copy.deepcopy(self.sudoku)
+        for move in ancestors:
             (x, y), action = move[:2]
-            rollout[x, y] = action
-        print(rollout)
-        print(np.count_nonzero(rollout))
+            new[x, y] = action
+        return new
 
     def compute_tree_policy(self, node, rl=False, c=1):
         res = None
