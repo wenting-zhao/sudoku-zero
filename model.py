@@ -284,6 +284,24 @@ class model(model_base):
             return size
         else:
             self.sess.run([self.feed_step], feed_dict=feed)
+    # For supervised training
+    def sl_train(self, summary_writer, features, labels, print_step=100):
+        start_time = time.time()
+        feed_dict = {self.features: features, self.label: labels}
+        for _ in range(print_step - 1):
+            self.sess.run(self.train_step, feed_dict=feed_dict)
+        _, loss, ce, mse, reg, summary = self.sess.run([self.train_step, self.loss, self.ce, self.mse, self.reg, self.summary_step], feed_dict=feed_dict)
+        global_step = self.sess.run(self.global_step)
+        summary_writer.add_summary(summary, global_step)
+
+        duration = time.time() - start_time
+        num_sample_per_step = self.batch_size
+        sample_per_sec = num_sample_per_step  * print_step / duration
+        sec_per_batch = duration / print_step
+        format_str = ("global step %d loss %.3f; ce %.3f; mse %.3f; reg %.3f; %.1f samples/sec; %.3f sec/batch")
+        print (format_str % (global_step, loss, ce, mse, reg, sample_per_sec, sec_per_batch))
+        sys.stdout.flush()
+
 
     def train(self, summary_writer, print_step=100):
         start_time = time.time()
