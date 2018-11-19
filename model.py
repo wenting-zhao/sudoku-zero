@@ -17,6 +17,7 @@ class model(model_base):
         self.batch_size = args.batch_size if self.mode == "train" else args.eval_batch_size
         self.gpu_list = [item for item in gpu_list.split(',')]
         self.args = args
+        self.overall_acc = -1
 
     def _loss(self, logit, value, nxt_move, label, prob, regularizer):
         #cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logit, labels=nxt_move)
@@ -65,8 +66,8 @@ class model(model_base):
         with self.graph.as_default():
             self.global_step = tf.Variable(0, name='steps', trainable=False)
             if self.mode == "train":
-                nxt_move = self.nxt_move = _placeholder(shape=[self.args.board_size * self.args.board_size], name="nxt_move")
-                features = self.features = _placeholder(shape=[self.args.board_size, self.args.board_size, self.args.feature_num], name="features")
+                nxt_move = self.nxt_move = _placeholder(shape=[None, self.args.board_size * self.args.board_size], name="nxt_move")
+                features = self.features = _placeholder(shape=[None, self.args.board_size, self.args.board_size, self.args.feature_num], name="features")
             else:
                 if self.mode == "predict":
                     X = []
@@ -91,8 +92,8 @@ class model(model_base):
                     #self.value = tf.identity(value, "value_output")
             else:
                 #TODO:
-                #lr = tf.train.piecewise_constant()
-                lr = self.args.lr
+                lr = tf.train.piecewise_constant(self.global_step, [500000, 1000000], [0.001, 0.0001, 0.00001])
+                #lr = self.args.lr
 
                 optimizer = tf.train.MomentumOptimizer(learning_rate=lr, momentum=0.9)
 
@@ -102,6 +103,7 @@ class model(model_base):
                 batch_X  = tf.split(self.features, n_gpu)
                 #batch_nm = tf.split(nxt_move, n_gpu)
                 batch_nm = tf.split(self.nxt_move, n_gpu)
+                batch_label = [0 for i in range(len(batch_nm))]
 
                 tower_grads = []
                 tower_loss  = []
@@ -109,6 +111,7 @@ class model(model_base):
                 tower_ce    = []
                 tower_mse   = []
                 tower_reg   = []
+                tower_acc = []
 
                 for i, cur_gpu in enumerate(self.gpu_list):
                     cur_gpu = int(cur_gpu)
@@ -127,6 +130,7 @@ class model(model_base):
                             tower_prob.append(prob)
                             #ce, mse, reg, loss, kl = self._loss(logit, v, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
                             ce, mse, reg, loss, kl = self._loss(logit, 0, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
+                            acc = tf.metrics.accuracy(labels=tf.argmax(batch_nm[i]), predictions=tf.argmax(logit))
 
                             grads = optimizer.compute_gradients(loss)
                             if grads is None:
@@ -136,6 +140,7 @@ class model(model_base):
                             tower_ce.append(ce)
                             tower_mse.append(mse)
                             tower_reg.append(reg)
+                            tower_acc.append(acc)
 
                             tf.summary.scalar('/gpu:%d/mse'%i, mse)
                             tf.summary.scalar('/gpu:%d/ce'%i,ce)
@@ -151,6 +156,7 @@ class model(model_base):
                 self.ce   = tf.reduce_mean(tower_ce)
                 self.mse  = tf.reduce_mean(tower_mse)
                 self.reg  = tf.reduce_mean(reg)
+                self.acc  = tf.reduce_mean(tower_acc)
 
                 tf.summary.scalar("lr", lr)
                 self.summary_step = tf.summary.merge_all()
@@ -287,10 +293,14 @@ class model(model_base):
     # For supervised training
     def sl_train(self, summary_writer, features, labels, print_step=100):
         start_time = time.time()
-        feed_dict = {self.features: features, self.label: labels}
+        feed_dict = {self.features: features, self.nxt_move: labels}
         for _ in range(print_step - 1):
             self.sess.run(self.train_step, feed_dict=feed_dict)
-        _, loss, ce, mse, reg, summary = self.sess.run([self.train_step, self.loss, self.ce, self.mse, self.reg, self.summary_step], feed_dict=feed_dict)
+        _, loss, ce, mse, reg, acc, summary = self.sess.run([self.train_step, self.loss, self.ce, self.mse, self.reg, self.acc, self.summary_step], feed_dict=feed_dict)
+        if self.overall_acc == -1.0:
+            self.overall_acc = acc
+        else:
+            self.overall_acc = 0.999 * self.overall_acc + 0.001 * acc
         global_step = self.sess.run(self.global_step)
         summary_writer.add_summary(summary, global_step)
 
@@ -298,8 +308,8 @@ class model(model_base):
         num_sample_per_step = self.batch_size
         sample_per_sec = num_sample_per_step  * print_step / duration
         sec_per_batch = duration / print_step
-        format_str = ("global step %d loss %.3f; ce %.3f; mse %.3f; reg %.3f; %.1f samples/sec; %.3f sec/batch")
-        print (format_str % (global_step, loss, ce, mse, reg, sample_per_sec, sec_per_batch))
+        format_str = ("global step %d loss %.3f; ce %.3f; mse %.3f; reg %.3f acc %.3f total_acc %.3f; %.1f samples/sec; %.3f sec/batch")
+        print (format_str % (global_step, loss, ce, mse, reg, acc, self.overall_acc, sample_per_sec, sec_per_batch))
         sys.stdout.flush()
 
 
