@@ -5,6 +5,7 @@ import time
 import sys
 import copy
 
+from sklearn.metrics import accuracy_score
 from model_base import model_base
 
 def _placeholder(dtype=tf.float32, shape=None, name=None):
@@ -92,7 +93,7 @@ class model(model_base):
                     #self.value = tf.identity(value, "value_output")
             else:
                 #TODO:
-                lr = tf.train.piecewise_constant(self.global_step, [500000, 1000000], [0.001, 0.0001, 0.00001])
+                lr = tf.train.piecewise_constant(self.global_step, [500000, 1000000], [0.0005, 0.0001, 0.00001])
                 #lr = self.args.lr
 
                 optimizer = tf.train.MomentumOptimizer(learning_rate=lr, momentum=0.9)
@@ -111,7 +112,7 @@ class model(model_base):
                 tower_ce    = []
                 tower_mse   = []
                 tower_reg   = []
-                tower_acc = []
+                self.prob_acc = None
 
                 for i, cur_gpu in enumerate(self.gpu_list):
                     cur_gpu = int(cur_gpu)
@@ -130,7 +131,7 @@ class model(model_base):
                             tower_prob.append(prob)
                             #ce, mse, reg, loss, kl = self._loss(logit, v, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
                             ce, mse, reg, loss, kl = self._loss(logit, 0, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
-                            acc = tf.metrics.accuracy(labels=tf.argmax(batch_nm[i]), predictions=tf.argmax(logit))
+                            #acc = tf.metrics.accuracy(labels=tf.argmax(batch_nm[i]), predictions=tf.argmax(prob))
 
                             grads = optimizer.compute_gradients(loss)
                             if grads is None:
@@ -140,7 +141,6 @@ class model(model_base):
                             tower_ce.append(ce)
                             tower_mse.append(mse)
                             tower_reg.append(reg)
-                            tower_acc.append(acc)
 
                             tf.summary.scalar('/gpu:%d/mse'%i, mse)
                             tf.summary.scalar('/gpu:%d/ce'%i,ce)
@@ -156,7 +156,7 @@ class model(model_base):
                 self.ce   = tf.reduce_mean(tower_ce)
                 self.mse  = tf.reduce_mean(tower_mse)
                 self.reg  = tf.reduce_mean(reg)
-                self.acc  = tf.reduce_mean(tower_acc)
+                #self.acc = tf.metrics.accuracy(labels=tf.argmax(self.nxt_move), predictions=tf.argmax(self.prob))
 
                 tf.summary.scalar("lr", lr)
                 self.summary_step = tf.summary.merge_all()
@@ -296,7 +296,8 @@ class model(model_base):
         feed_dict = {self.features: features, self.nxt_move: labels}
         for _ in range(print_step - 1):
             self.sess.run(self.train_step, feed_dict=feed_dict)
-        _, loss, ce, mse, reg, acc, summary = self.sess.run([self.train_step, self.loss, self.ce, self.mse, self.reg, self.acc, self.summary_step], feed_dict=feed_dict)
+        _, loss, ce, mse, reg, prob, summary = self.sess.run([self.train_step, self.loss, self.ce, self.mse, self.reg, self.prob, self.summary_step], feed_dict=feed_dict)
+        acc = accuracy_score(np.argmax(labels, 1), np.argmax(prob, 1))
         if self.overall_acc == -1.0:
             self.overall_acc = acc
         else:
@@ -317,7 +318,7 @@ class model(model_base):
         start_time = time.time()
         for _ in range(print_step - 1):
             self.sess.run(self.train_step)
-        _, loss, ce, mse, reg, summary = self.sess.run([self.train_step, self.loss, self.ce, self.mse, self.reg, self.summary_step])
+        _, loss, ce, mse, reg, prob, summary = self.sess.run([self.train_step, self.loss, self.ce, self.mse, self.reg, self.prob, self.summary_step])
         global_step = self.sess.run(self.global_step)
         summary_writer.add_summary(summary, global_step)
 

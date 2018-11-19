@@ -67,7 +67,7 @@ class model_base(object):
                 self.cur_checkpoint = str(ckpt.model_checkpoint_path)
             return True
         else:
-            pass
+            print ("Train from scratch")
             #raise ValueError("No Model to Load")
 
         
