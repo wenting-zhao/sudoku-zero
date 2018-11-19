@@ -48,6 +48,8 @@ sudoku = np.asarray([[ 5,  0,  0, 13,  2,  0,  0, 14,  0,  0,  0, 15,  4,  0,  0
                     [ 0,  0,  7,  0, 16,  0,  0,  0,  0,  0,  5,  0, 14,  0,  6,  0],
                     [ 0, 12,  0,  0,  0, 11,  7,  3,  0,  0,  0,  2,  0,  0,  0,  0]])
 
+sudoku = np.zeros((16, 16))
+
 # all_sudoku = np.load("datasets/complete_16.npy")
 # sudoku = all_sudoku[random.randrange(10000)]
 orig = copy.deepcopy(sudoku)

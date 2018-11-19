@@ -42,6 +42,7 @@ class MCTS():
 
         for i in range(n):
             res = self._get_next_node(self.root)
+            assert (len(res) != 0)
             if res[0] == "unsat":
                 node.reward = 0
                 self.backup(node)

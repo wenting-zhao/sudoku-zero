@@ -57,6 +57,8 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             # You could pass the model as an argument into the MCTS class, and use model.predict to get the prediction given by NN
             mcts = MCTS(model=model, rollout=100, sudoku_size=16, ucb1_confidence=1, tree_policy="UCB1")
             sudoku = copy.deepcopy(all_sudoku[random.randrange(10000)])
+            #sudoku = np.zeros((16, 16))
+            #sudoku[1, 1] = 1
             update_sudoku(sudoku)
             data = []
             idx = 0
@@ -72,6 +74,7 @@ def meditation(random_state, gpu_id, queue, lock, verbose=True):
             #data = (np.random.random((9, 9, 10)), np.random.random(82), 10.0)
             # (sudoku, (x, y), action, distribution)
             # [([n, n], ((x, y), {1--n}, list))]
+            print ("put data in the queue")
             queue.put(data)
 
         except Exception as e:
@@ -156,12 +159,15 @@ def train(cluster):
                 state = item[0]
                 pos = []
                 pos_value = []
-                for j, candidata_pos in enumerate(item[1]):
+                for j, candidate_pos in enumerate(item[1]):
                     pos.append(candidate_pos[0])
                     pos_value.append(candidate_pos[1])
-                for _ in xrange(args.board_size * args.board_size - len(pos)):
+                for _ in range(args.board_size * args.board_size - len(pos)):
                     pos.append((-1, -1))
                 variable_order_data.append((np.array(state), np.array(nxt_move), reward, np.array(pos), np.array(pos_value)))
+                assert(len(pos) != 0)
+                assert(len(pos_value) != 0)
+                print ("Try to push samples")
                 if n_sample % 1000 == 0:
                     size = train_agent.push_sample(np.array(state), np.array(nxt_move), reward, np.array(pos), get_cur_size=True)
                     print ("Num training sample=%d, tf queue size=%d" % (n_sample, size))
@@ -169,6 +175,7 @@ def train(cluster):
                     train_agent.push_sample(np.array(state), np.array(nxt_move), reward, np.array(pos))
                 n_sample += 1
                 saved_data += 1
+                print ("data collection number: ", saved_data)
                 if saved_data == int(1e7):
                     total_data += 1
                     saved_data = 0
