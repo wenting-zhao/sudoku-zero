@@ -71,15 +71,7 @@ class model(model_base):
                 features = self.features = _placeholder(shape=[None, self.args.board_size, self.args.board_size, self.args.feature_num], name="features")
             else:
                 if self.mode == "predict":
-                    X = []
-                    history = self.history = _placeholder(tf.string, name='history')
-                    for i in range(self.batch_size):
-                        # TODO: write extract feature as a tfop 
-                        features = history
-                        X.append(features)
-                    X = tf.reshape(X, [self.batch_size, self.args.board_size, self.args.board_size, self.args.feature_num], name="X")
-
-                self.X = tf.to_float(X)
+                    self.X = _placeholder(shape=[None, self.args.board_size, self.args.board_size, self.args.feature_num], name="infer features")
 
     def sl_build_model(self):
         board_size = self.args.board_size
@@ -336,13 +328,18 @@ class model(model_base):
     def get_all_var(self):
         return self.all_var
 
-    def predict(self, historys):
-        ori_len = len(historys)
-        while len(historys) != self.batch_size:
-            historys.append("")
-        feed = {self.history: historys}
-        prob, value = self.sess.run([self.prob, self.value], feed_dict=dict)
-        return prob[:ori_len, :], value[:ori_len]
+    def predict(self, features):
+        feed_dict = {self.X: features}
+        prob = self.sess.run([self.prob], feed_dict=feed_dict)
+        return prob
+
+    #def predict(self, historys):
+    #    ori_len = len(historys)
+    #    while len(historys) != self.batch_size:
+    #        historys.append("")
+    #    feed = {self.history: historys}
+    #    prob, value = self.sess.run([self.prob, self.value], feed_dict=dict)
+    #    return prob[:ori_len, :], value[:ori_len]
 
 
 
