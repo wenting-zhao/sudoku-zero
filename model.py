@@ -71,7 +71,7 @@ class model(model_base):
                 features = self.features = _placeholder(shape=[None, self.args.board_size, self.args.board_size, self.args.feature_num], name="features")
             else:
                 if self.mode == "predict":
-                    self.X = _placeholder(shape=[None, self.args.board_size, self.args.board_size, self.args.feature_num], name="infer features")
+                    self.X = _placeholder(shape=[None, self.args.board_size, self.args.board_size, self.args.feature_num], name="infer_features")
 
     def sl_build_model(self):
         board_size = self.args.board_size
