@@ -34,7 +34,9 @@ class MCTS():
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
         all_minimum = self._get_all_minimum(self.search_order)
         if self.infer:
-            self.model.predict(self.sudoku, all_minimum.keys())
+            features = np.zeros((1, 16, 16, 18))
+            features[0] = self.model._extract_feature(new_state(ancestors), all_minimum.keys())
+            self.model.predict(features)
         else:
             pos, possible_values = random.choice(all_minimum)
         self.root.depth = np.count_nonzero(self.explored_nodes) - 1
@@ -137,7 +139,9 @@ class MCTS():
                     search_order = self._get_search_order(new_constraints, explored)
                     all_minimum = self._get_all_minimum(search_order)
                     if self.infer:
-                        self.model.predict(new_state(ancestors), all_minimum.keys())
+                        features = np.zeros((1, 16, 16, 18))
+                        features[0] = self.model._extract_feature(new_state(ancestors), all_minimum.keys())
+                        self.model.predict(features)
                     else:
                         pos, possible_values = random.choice(all_minimum)
                     self._create_leaves(node, pos, possible_values)
