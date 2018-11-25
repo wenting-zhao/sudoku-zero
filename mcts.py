@@ -33,10 +33,17 @@ class MCTS():
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
         all_minimum = self._get_all_minimum(self.search_order)
+        print("MCTS started")
         if self.infer:
             features = np.zeros((1, 16, 16, 18))
-            features[0] = self.model._extract_feature(new_state(ancestors), all_minimum.keys())
-            self.model.predict(features)
+            features[0] = self.model._extract_feature(self.sudoku, [x[0] for x in all_minimum])
+            max_prob = np.argmax(self.model.predict(features))
+            pos = divmod(max_prob, 16)
+            for elm in all_minimum:
+                if elm[0] == pos:
+                    possible_values = elm[1]
+                    break
+            assert possible_values is not None
         else:
             pos, possible_values = random.choice(all_minimum)
         self.root.depth = np.count_nonzero(self.explored_nodes) - 1
@@ -62,6 +69,7 @@ class MCTS():
             if if_found:
                 return self._get_search_info(ancestors), i
             self.backup(node)
+            print(i)
         return None
 
     def _get_search_info(self, ancestors):
@@ -140,8 +148,15 @@ class MCTS():
                     all_minimum = self._get_all_minimum(search_order)
                     if self.infer:
                         features = np.zeros((1, 16, 16, 18))
-                        features[0] = self.model._extract_feature(new_state(ancestors), all_minimum.keys())
-                        self.model.predict(features)
+                        features[0] = self.model._extract_feature(self.new_state(ancestors), [x[0] for x in all_minimum])
+                        max_prob = np.argmax(self.model.predict(features))
+                        pos = divmod(max_prob, 16)
+                        for elm in all_minimum:
+                            if elm[0] == pos:
+                                possible_values = elm[1]
+                                break
+                        assert possible_values is not None
+                        print("choose {} from {}".format(pos, all_minimum))
                     else:
                         pos, possible_values = random.choice(all_minimum)
                     self._create_leaves(node, pos, possible_values)
