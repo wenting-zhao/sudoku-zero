@@ -3,6 +3,7 @@ import pickle
 import sys
 import copy
 import random
+import string
 
 from mcts import MCTS
 
@@ -15,6 +16,9 @@ def update_sudoku(sudoku, prob=0.66):
         if whether_remove(prob) is True:
             sudoku[x, y] = 0
 
+def id_generator(size=10, chars=string.ascii_uppercase + string.digits):
+    return ''.join(random.choice(chars) for _ in range(size))
+
 def main():
     n = int(sys.argv[1])
     all_sudoku = np.load("datasets/complete_16.npy")
@@ -26,14 +30,14 @@ def main():
         data = []
         while idx < 100:
             res = mcts(sudoku, n=1000)
-            print(res)
             if res is None:
                 continue
             else:
                 data.append(res)
                 idx += 1
-        pickle.dump(data, open("{}.p".format(i), "wb"))
+        pickle.dump(data, open("data_{}.p".format(id_generator()), "wb"))
 
 
 if __name__ == '__main__':
     main()
+
