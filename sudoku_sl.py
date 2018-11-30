@@ -12,33 +12,42 @@ import importlib
 def train():
     module = importlib.import_module(args.type)
     train_agent = module.sudoku_model(args, mode="train", gpu_list=args.train_gpu)
-    train_agent.sl_preprocess()
-    train_agent.sl_build_model()
+    train_agent.sl_preprocess(args.model_type)
+    train_agent.sl_build_model(args.model_type)
     train_agent.load_model()
 
-    summary_writter = tf.summary.FileWriter("%s-sudoku-zero-sl.log" % args.type, train_agent.sess.graph)    
+    summary_writter = tf.summary.FileWriter("%s-sudoku-zero-sl.log" % args.log, train_agent.sess.graph)    
     start_time = time.time()
     train_data = np.load("sudoku_sl_data.npy")
     train_label = np.load("sudoku_sl_label.npy")
+    train_value = None
+    if args.model_type != 1:
+        train_value = np.load("sudoku_sl_value.npy")
     shuffle_index = np.arange(train_data.shape[0])
     np.random.shuffle(shuffle_index)
     train_data = train_data[shuffle_index]
     train_label = train_label[shuffle_index]
+    if train_value != None:
+        train_value = train_value[shuffle_index]
     num_data = train_data.shape[0]
     print ("Total training data number: %d" % num_data)
-    for i in range(int(num_data // args.batch_size)):
-        if (i + 1) * args.batch_size > num_data:
-            break
-        print ("Training on %d-th minibatch" % i)
-        st = i * args.batch_size
-        ed = (i + 1) * args.batch_size
-        X = train_data[st:ed]
-        label = train_label[st:ed]
-        global_step = train_agent.get_step()
-        train_agent.sl_train(summary_writter, features=np.array(X), labels=np.array(label), print_step=10)
+    for iteration in range(10):
+        print ("Training on iteration: %d" % (iteration))
+        for i in range(int(num_data // args.batch_size)):
+            if (i + 1) * args.batch_size > num_data:
+                break
+            print ("Training on %d-th minibatch" % i)
+            st = i * args.batch_size
+            ed = (i + 1) * args.batch_size
+            X = train_data[st:ed]
+            label = train_label[st:ed]
+            if train_value != None:
+                value = train_value[st:ed]
+            global_step = train_agent.get_step()
+            train_agent.sl_train(summary_writter, features=np.array(X), labels=np.array(label), values=np.array(train_value), print_step=10)
 
-        if global_step % args.save_every == 0 and global_step > 0:
-            train_agent.saver.save(train_agent.sess, os.path.join(args.model_path, "model.ckpt"), global_step=global_step)
+            if global_step % args.save_every == 0 and global_step > 0:
+                train_agent.saver.save(train_agent.sess, os.path.join(args.model_path, "model.ckpt"), global_step=global_step)
 
     train_agent.saver.save(train_agent.sess, os.path.join(args.model_path, "model.ckpt"), global_step=global_step)
 
@@ -54,6 +63,7 @@ if __name__ == "__main__":
 
     argparser.add_argument("--port", type=int, default="12345")
     argparser.add_argument("--host", type=str, default="localhost")
+    argparser.add_argument("--log", type=str, default="default_log")
 
     argparser.add_argument("--num_thread", type=int, default=1)
     argparser.add_argument("--eval_batch_size", type=int, default=16)
@@ -67,6 +77,8 @@ if __name__ == "__main__":
     argparser.add_argument("--regularizer", type=bool, default=True)
     argparser.add_argument("--board_size", type=int, default=16)
     argparser.add_argument("--save_every", type=int, default=1000)
+    # 1: Policy 2: Value 3: P+V
+    argparser.add_argument("--model_type", type=int, default=1)
 
     args = argparser.parse_args()
 
