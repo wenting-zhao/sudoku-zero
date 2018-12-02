@@ -168,5 +168,5 @@ class Statistics(object):
         self._stats[name].append(value)
 
     def get_stats(self):
-return self._stats
+        return self._stats
 
