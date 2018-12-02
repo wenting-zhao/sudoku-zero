@@ -63,7 +63,7 @@ def at_exit(stats):
             sys.stderr.write("%-*s : %f\n" % (maxlen + 4, name + ' min', min(values)))
             sys.stderr.write("%-*s : %f\n" % (maxlen + 4, name + ' max', max(values)))
             sys.stderr.write("%-*s : %f\n" % (maxlen + 4, name + ' avg', np.mean(values)))
-            sys.stderr.write("%-*s : %f\n" % (maxlen + 4, name + ' avg', np.median(values)))
+            sys.stderr.write("%-*s : %f\n" % (maxlen + 4, name + ' median', np.median(values)))
 
 def main():
     stats = utils.Statistics()
