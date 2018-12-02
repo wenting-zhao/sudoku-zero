@@ -9,16 +9,17 @@ class MCTS():
     tree policy, a default policy, and a backup strategy.
     See e.g. Browne et al. (2012) for a survey on monte carlo tree search
     """
-    def __init__(self, model, sudoku_size, infer=False, rollout=10, ucb1_confidence=1.41, tree_policy="UCB1"):
+    def __init__(self, model, sudoku_size, gen_data=False, infer=False, rollout=10, ucb1_confidence=1.41):
         self.model = model
         self.infer = infer
+        self.gen_data = gen_data
         self.sudoku_size = sudoku_size
         self.rollout = rollout
         self.max_depth = self.sudoku_size ** 2
-        self.tree_policy = tree_policy
         self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
         self.ucb1_confidence = ucb1_confidence
         self.root = Node(parent=None, action=None, pos="root")
+        self.sample = 0
 
     def __call__(self, sudoku_state, n=10000):
         """
@@ -33,7 +34,6 @@ class MCTS():
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
         all_minimum = self._get_all_minimum(self.search_order)
-        print("MCTS started")
         if self.infer:
             features = np.zeros((1, 16, 16, 18))
             features[0] = self.model._extract_feature(self.sudoku, [x[0] for x in all_minimum])
@@ -62,14 +62,18 @@ class MCTS():
             if_found = False
             for _ in range(self.rollout):
                 depth, _ = self._roll_out(node, ancestors)
+                reward.append(depth / self.max_depth)
+                self.sample += 1
                 if depth == self.max_depth:
                     if_found = True
-                reward.append(depth / self.max_depth)
+                    break
             node.reward = max(reward)
             if if_found:
-                return self._get_search_info(ancestors), i
+                if self.gen_data:
+                    return self._get_search_info(ancestors), i
+                else:
+                    return i
             self.backup(node)
-            print(i)
         return None
 
     def _get_search_info(self, ancestors):
@@ -96,6 +100,9 @@ class MCTS():
             del cell_possible_actions[pos]
         return search_info
 
+    def reset_sample(self):
+        self.sample = 0
+
     def _compute_softmax(self, node):
         # note that this is only correct with 1d array
         x = [0] * self.sudoku_size
@@ -119,7 +126,7 @@ class MCTS():
         x = np.zeros(len(node.children))
         children = list(node.children)
         for i in range(len(children)):
-            x[i] = self.compute_tree_policy(children[i], rl=False)
+            x[i] = self.compute_tree_policy(children[i])
         e_x = np.exp(x - np.max(x))
         distribution = e_x / e_x.sum()
         res = np.random.choice(children, 1, p=distribution)
@@ -156,7 +163,6 @@ class MCTS():
                                 possible_values = elm[1]
                                 break
                         assert possible_values is not None
-                        print("choose {} from {}".format(pos, all_minimum))
                     else:
                         pos, possible_values = random.choice(all_minimum)
                     self._create_leaves(node, pos, possible_values)
@@ -223,19 +229,8 @@ class MCTS():
             new[x, y] = action
         return new
 
-    def compute_tree_policy(self, node, rl=False, c=1):
-        res = None
-        if self.tree_policy == "UCB1":
-            res = (node.score +
-                   self.ucb1_confidence * np.sqrt(2 * np.log(node.parent.visited) / node.visited))
-        elif self.tree_policy == "depth":
-            res = node.reward
-
-        if rl:
-            # See details in the alphago zero paper
-            node.prior = self.model.predict(history=None)
-            u = c * (node.prior / (1+node.visited))
-            res += u
+    def compute_tree_policy(self, node):
+        res = (node.score + self.ucb1_confidence * np.sqrt(2 * np.log(node.parent.visited) / node.visited))
         return res
 
     def backup(self, node):
