@@ -65,9 +65,9 @@ def main():
     train_agent.sl_build_model()
     train_agent.load_model()
 
-    mcts = MCTS(train_agent, sudoku_size=16, infer=True, rollout=100, ucb1_confidence=0, tree_policy="UCB1")
+    mcts = MCTS(train_agent, sudoku_size=16, infer=True, rollout=100, ucb1_confidence=0)
     res = mcts(sudoku, n=100000)
-    print(res)
+
 
 if __name__ == '__main__':
     argparser = argparse.ArgumentParser(sys.argv[0])
