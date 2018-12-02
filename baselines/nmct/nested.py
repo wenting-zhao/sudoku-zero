@@ -8,6 +8,7 @@ class NestedMCTS():
         self.max_depth = self.sudoku_size ** 2
         self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
         self.root = Node(parent=None, action=None, pos="root")
+        self.sample = 0
 
     # def iterativeNested(self, position, level):
     #   best_score = -1
@@ -61,13 +62,14 @@ class NestedMCTS():
         if level == 1:
             for child in node.children:
                 child.reward, child.move_sequence = self._roll_out(child, ancestors+[((child.pos), child.action)])
+                self.sample += 1
                 if child.reward == self.max_depth:
                     return child.move_sequence, "complete"
             best_child = sorted(node.children, key=lambda e: e.reward, reverse=True)[0]
         else:
             best_candidates = []
             for child in node.children:
-                candidate = nested(child, level-1)
+                candidate = self.nested(child, level-1, ancestors+[((child.pos), child.action)])
                 best_candidates.append(candidate)
             best_child = sorted(best_candidates, key=lambda e: e.reward, reverse=True)[0]
         if best_child.reward > best_score:
@@ -219,6 +221,9 @@ class NestedMCTS():
 	# 		position = play(position, random_move)
 	# 	return score
 
+    def reset_sample(self):
+        self.sample = 0
+
 
 class Node():
     """
@@ -237,31 +242,40 @@ class Node():
 
 
 def main():
-    sudoku = np.asarray([[ 5,  0,  0, 13,  2,  0,  0, 14,  0,  0,  0, 15,  4,  0,  0,  0],
-                        [ 2,  6, 10,  0,  1,  5,  0,  0,  0,  8,  0,  0,  0,  0,  0, 15],
-                        [ 3,  0,  0,  0,  0,  0,  0, 16,  0,  0,  0,  0,  0,  0, 10, 14],
-                        [ 4,  8,  0,  0,  0,  0,  0,  0,  0,  6, 10,  0,  0,  5,  0,  0],
-                        [ 0,  5,  0,  0,  0,  2, 14,  0,  0,  0, 15,  0,  0,  0, 16,  0],
-                        [ 6,  2,  0,  0,  0,  0, 13,  0,  0,  4, 16,  0,  0,  3, 15,  0],
-                        [ 7,  0,  0, 11,  0,  0,  0,  0,  5,  1,  0,  9,  6,  0, 14, 10],
-                        [ 0,  0,  0, 12,  0,  3,  0,  0,  6,  0,  0,  0,  5,  1, 13,  0],
-                        [ 0,  0,  1,  0, 10,  0,  0,  0, 11,  0,  0,  7, 12,  0,  4,  0],
-                        [ 0,  0,  2,  6,  9, 13,  1,  0,  0,  0,  0,  0, 11, 15,  0,  0],
-                        [11,  0,  0,  0, 12,  0,  4,  0,  9,  0,  0,  5,  0,  0,  0,  0],
-                        [ 0, 16,  0,  0,  0, 15,  3,  0,  0,  0,  2,  0,  0,  0,  1,  0],
-                        [13,  0,  5,  1,  0,  0,  0,  2, 15, 11,  7,  3,  0, 12,  0,  0],
-                        [ 0,  0,  0,  0, 13,  0,  0,  0, 16,  0,  0,  0,  0, 11,  0,  0],
-                        [ 0,  0,  7,  0, 16,  0,  0,  0,  0,  0,  5,  0, 14,  0,  6,  0],
-                        [ 0, 12,  0,  0,  0, 11,  7,  3,  0,  0,  0,  2,  0,  0,  0,  0]])
+    sudoku = np.asarray([[0, 0, 0, 0, 0, 0, 0, 1, 0],
+                     [4, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 2, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 5, 0, 4, 0, 7],
+                     [0, 0, 8, 0, 0, 0, 3, 0, 0],
+                     [0, 0, 1, 0, 9, 0, 0, 0, 0],
+                     [3, 0, 0, 4, 0, 0, 2, 0, 0],
+                     [0, 5, 0, 1, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 8, 0, 6, 0, 0, 0]])
+    # sudoku = np.asarray([[ 5,  0,  0, 13,  2,  0,  0, 14,  0,  0,  0, 15,  4,  0,  0,  0],
+    #                     [ 2,  6, 10,  0,  1,  5,  0,  0,  0,  8,  0,  0,  0,  0,  0, 15],
+    #                     [ 3,  0,  0,  0,  0,  0,  0, 16,  0,  0,  0,  0,  0,  0, 10, 14],
+    #                     [ 4,  8,  0,  0,  0,  0,  0,  0,  0,  6, 10,  0,  0,  5,  0,  0],
+    #                     [ 0,  5,  0,  0,  0,  2, 14,  0,  0,  0, 15,  0,  0,  0, 16,  0],
+    #                     [ 6,  2,  0,  0,  0,  0, 13,  0,  0,  4, 16,  0,  0,  3, 15,  0],
+    #                     [ 7,  0,  0, 11,  0,  0,  0,  0,  5,  1,  0,  9,  6,  0, 14, 10],
+    #                     [ 0,  0,  0, 12,  0,  3,  0,  0,  6,  0,  0,  0,  5,  1, 13,  0],
+    #                     [ 0,  0,  1,  0, 10,  0,  0,  0, 11,  0,  0,  7, 12,  0,  4,  0],
+    #                     [ 0,  0,  2,  6,  9, 13,  1,  0,  0,  0,  0,  0, 11, 15,  0,  0],
+    #                     [11,  0,  0,  0, 12,  0,  4,  0,  9,  0,  0,  5,  0,  0,  0,  0],
+    #                     [ 0, 16,  0,  0,  0, 15,  3,  0,  0,  0,  2,  0,  0,  0,  1,  0],
+    #                     [13,  0,  5,  1,  0,  0,  0,  2, 15, 11,  7,  3,  0, 12,  0,  0],
+    #                     [ 0,  0,  0,  0, 13,  0,  0,  0, 16,  0,  0,  0,  0, 11,  0,  0],
+    #                     [ 0,  0,  7,  0, 16,  0,  0,  0,  0,  0,  5,  0, 14,  0,  6,  0],
+    #                     [ 0, 12,  0,  0,  0, 11,  7,  3,  0,  0,  0,  2,  0,  0,  0,  0]])
     #sudoku = np.zeros((n,n)).astype(int)
     n = sudoku.shape[0]
     nmct = NestedMCTS(n)
     cnt = 0
     while True:
         cnt += 1
-        res = nmct(sudoku)
+        res = nmct(sudoku, level=1)
         if np.count_nonzero(res) == n*n:
-            print(res, cnt)
+            print(res, nmct.sample)
             break
 
 if __name__ == '__main__':
