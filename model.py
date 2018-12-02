@@ -49,8 +49,6 @@ class model(model_base):
     #    return ret
 
     def _extract_feature(self, history, pos):
-        print (history)
-        print (history.shape)
         n_board = history.shape[0]
         ret = np.zeros((n_board, n_board, n_board + 2))
         print (ret.shape)
