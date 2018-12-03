@@ -68,7 +68,7 @@ def at_exit(stats):
 def main():
     stats = utils.Statistics()
     args = parse_args()
-    sudoku = np.zeros((16, 16))#np.load(args.infile)
+    sudoku = np.load(args.infile)
     n = len(sudoku)
     with stats.time('mcts_setup'):
         mcts = MCTS(None, sudoku_size=n, rollout=100, ucb1_confidence=0)
