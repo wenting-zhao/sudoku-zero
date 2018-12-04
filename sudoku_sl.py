@@ -16,7 +16,7 @@ def train():
     train_agent.sl_build_model(args.model_type)
     train_agent.load_model()
 
-    summary_writter = tf.summary.FileWriter("%s-modeltype_%d-sl.log" % args.log, args.model_type, train_agent.sess.graph)    
+    summary_writter = tf.summary.FileWriter("%s-modeltype_%d-sl.log" % (args.log, args.model_type), train_agent.sess.graph)    
     start_time = time.time()
     train_data = np.load("new_sudoku_sl_data.npy")
     train_label = np.load("new_sudoku_sl_label.npy")
@@ -44,7 +44,10 @@ def train():
             if args.model_type != 1:
                 value = train_value[st:ed]
             global_step = train_agent.get_step()
-            train_agent.sl_train(summary_writter, features=np.array(X), labels=np.array(label), values=np.array(value), model_type=args.model_type, print_step=10)
+            if model_type != 1:
+                train_agent.sl_train(summary_writter, features=np.array(X), labels=np.array(label), values=np.array(value), model_type=args.model_type, print_step=10)
+            else:
+                train_agent.sl_train(summary_writter, features=np.array(X), labels=np.array(label), values=None, model_type=args.model_type, print_step=10)
 
             if global_step % args.save_every == 0 and global_step > 0:
                 train_agent.saver.save(train_agent.sess, os.path.join(args.model_path, "model.ckpt"), global_step=global_step)
