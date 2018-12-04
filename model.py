@@ -19,11 +19,16 @@ class model(model_base):
         self.gpu_list = [item for item in gpu_list.split(',')]
         self.args = args
         self.overall_acc = -1
+        self.overall_v_acc = -1
 
-    def _loss(self, logit, value, nxt_move, label, prob, regularizer):
+    def _loss(self, logit, value_logit, nxt_move, nxt_value, label, prob, regularizer, model_type):
         #cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logit, labels=nxt_move)
-        cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=nxt_move, logits=logit)
-        cross_entropy_mean = tf.reduce_mean(cross_entropy)
+        if model_type != 2:
+            cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=nxt_move, logits=logit)
+            cross_entropy_mean = tf.reduce_mean(cross_entropy)
+        if model_type != 1:
+            value_cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=nxt_value, logits=value_logit)
+            value_cross_entropy_mean = tf.reduce_mean(value_cross_entropy)
 
         #v_diff = tf.squared_difference(value, label)
         #v_loss = tf.reduce_mean(v_diff)
@@ -32,11 +37,24 @@ class model(model_base):
         reg_term = tf.add_n(reg_variables_gradients)
 
         eps = 1e-6
-        kl_divergence = tf.reduce_sum(nxt_move * tf.log((nxt_move + eps) / (prob + eps)), axis=1)
-        kl_mean = tf.reduce_mean(kl_divergence)
+        if model_type != 2:
+            kl_divergence = tf.reduce_sum(nxt_move * tf.log((nxt_move + eps) / (prob + eps)), axis=1)
+            kl_mean = tf.reduce_mean(kl_divergence)
 
         #return cross_entropy_mean, v_loss, reg_term, cross_entropy_mean + reg_term, kl_mean
-        return cross_entropy_mean, 0, reg_term, cross_entropy_mean + reg_term, kl_mean
+        ret_loss = 0
+        if model_type == 1:
+            ret_loss = cross_entropy_mean
+        elif model_type == 2:
+            ret_loss = value_cross_entropy_mean
+        else:
+            ret_loss = cross_entropy_mean + value_cross_entropy_mean
+        if model_type == 1:
+            return cross_entropy_mean, reg_term, ret_loss + reg_term, kl_mean
+        elif model_type == 2:
+            return value_cross_entropy_mean, reg_term, ret_loss + reg_term
+        else:
+            return cross_entropy_mean, value_cross_entropy_mean, reg_term, ret_loss + reg_term, kl_mean
 
     #def _extract_feature(self, history, pos):
     #    # TODO:
@@ -61,25 +79,36 @@ class model(model_base):
         return ret
 
     # For supervised training
-    def sl_preprocess(self):
+    def sl_preprocess(self, model_type):
         with self.graph.as_default():
             self.global_step = tf.Variable(0, name='steps', trainable=False)
             if self.mode == "train":
-                nxt_move = self.nxt_move = _placeholder(shape=[None, self.args.board_size * self.args.board_size], name="nxt_move")
                 features = self.features = _placeholder(shape=[None, self.args.board_size, self.args.board_size, self.args.feature_num], name="features")
+                if model_type == 1 or model_type == 3:
+                    nxt_move = self.nxt_move = _placeholder(shape=[None, self.args.board_size * self.args.board_size], name="nxt_move")
+                if model_type == 2 or model_type == 3:
+                    nxt_value = self.nxt_value = _placeholder(shape=[None, self.args.board_size], name="nxt_value")     
             else:
                 if self.mode == "predict":
                     self.X = _placeholder(shape=[None, self.args.board_size, self.args.board_size, self.args.feature_num], name="infer_features")
 
-    def sl_build_model(self):
+    def sl_build_model(self, model_type):
         board_size = self.args.board_size
         batch_size = self.args.batch_size
         with self.graph.as_default():
             if self.mode == "predict":
                 with tf.device('/gpu:%s' % self.gpu_list[0]):
-                    logit, _ = self._forward(self.X, batch_size, False, dev='tower0', reuse=None)
-                    prob = tf.nn.softmax(logit)
-                    self.prob = tf.identity(prob, "policy_output")
+                    if model_type == 1:
+                        logit, prob = self._forward(self.X, batch_size, False, dev='tower0', reuse=None, model_type=model_type)
+                        #prob = tf.nn.softmax(logit)
+                    elif model_type == 2:
+                        v_logit, v_prob = self._forward(self.X, batch_size, False, dev='tower0', reuse=None, model_type=model_type)
+                    else:
+                        logit, v_logit, v_logit, v_prob = self._forward(self.X, batch_size, False, dev='tower0', reuse=None, model_type=model_type)
+                    if model_type != 2:
+                        self.prob = tf.identity(prob, "policy_output")
+                    if model_type != 1:
+                        self.value = tf.identity(value, "value_output")
                     #self.value = tf.identity(value, "value_output")
             else:
                 #TODO:
@@ -93,12 +122,18 @@ class model(model_base):
                 #batch_X  = tf.split(X, n_gpu)
                 batch_X  = tf.split(self.features, n_gpu)
                 #batch_nm = tf.split(nxt_move, n_gpu)
-                batch_nm = tf.split(self.nxt_move, n_gpu)
-                batch_label = [0 for i in range(len(batch_nm))]
+                if model_type != 2:
+                    batch_nm = tf.split(self.nxt_move, n_gpu)
+                if model_type != 1:
+                    batch_nv = tf.split(self.nxt_value, n_gpu)
+                if model_type != 2:
+                    batch_label = [0 for i in range(len(batch_nm))]
 
                 tower_grads = []
                 tower_loss  = []
                 tower_prob  = []
+                tower_v_prob = []
+                tower_v_ce = []
                 tower_ce    = []
                 tower_mse   = []
                 tower_reg   = []
@@ -112,15 +147,30 @@ class model(model_base):
                             gpu_batch_size = batch_size / n_gpu # This should be diveded 
                             regularizer = tf.contrib.layers.l2_regularizer(self.args.l2)
                             if i == 0:
-                                #logit, prob, v = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=None, regularizer=regularizer)
-                                logit, prob = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=None, regularizer=regularizer)
+                                if model_type == 1:
+                                    logit, prob = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=None, regularizer=regularizer, model_type=model_type)
+                                elif model_type == 2:
+                                    v_logit, v_prob = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=None, regularizer=regularizer, model_type=model_type)
+                                else:
+                                    logit, prob, v_logit, v_prob = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=None, regularizer=regularizer, model_type=model_type)
                             else:
-                                #logit, prob, v = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=True, regularizer=regularizer)
-                                logit, prob = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=True, regularizer=regularizer)
+                                if model_type == 1:
+                                    logit, prob = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=True, regularizer=regularizer, model_type=model_type)
+                                elif model_type == 2:
+                                    v_logit, v_prob = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=True, regularizer=regularizer, model_type=model_type)
+                                else:
+                                    logit, prob, v_logit, v_prob = self._forward(batch_X[i], gpu_batch_size, is_train=True, dev="tower%d"%i, reuse=True, regularizer=regularizer, model_type=model_type)
 
-                            tower_prob.append(prob)
-                            #ce, mse, reg, loss, kl = self._loss(logit, v, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
-                            ce, mse, reg, loss, kl = self._loss(logit, 0, batch_nm[i], batch_label[i], prob, regularizer=regularizer)
+                            if model_type != 2:
+                                tower_prob.append(prob)
+                            if model_type != 1:
+                                tower_v_prob.append(v_prob)
+                            if model_type == 1:
+                                ce, reg, loss, kl = self._loss(logit, 0, batch_nm[i], None, batch_label[i], prob, regularizer=regularizer, model_type=model_type)
+                            elif model_type == 2:
+                                v_ce, reg, loss = self._loss(None, v_logit, None, batch_nv[i], None, None, regularizer=regularizer, model_type=model_type)
+                            else:
+                                ce, v_ce, reg, loss, kl = self._loss(logit, v_logit, batch_nm[i], batch_nv[i], batch_label[i], prob, regularizer=regularizer, model_type=model_type)
                             #acc = tf.metrics.accuracy(labels=tf.argmax(batch_nm[i]), predictions=tf.argmax(prob))
 
                             grads = optimizer.compute_gradients(loss)
@@ -128,23 +178,35 @@ class model(model_base):
                                 print (i)
                             tower_grads.append(grads)
                             tower_loss.append(loss)
-                            tower_ce.append(ce)
-                            tower_mse.append(mse)
+                            if model_type != 2:
+                                tower_ce.append(ce)
+                            #tower_mse.append(mse)
+                            if model_type != 1:
+                                tower_v_ce.append(v_ce)
                             tower_reg.append(reg)
 
-                            tf.summary.scalar('/gpu:%d/mse'%i, mse)
-                            tf.summary.scalar('/gpu:%d/ce'%i,ce)
+                            if model_type != 1:
+                                tf.summary.scalar('/gpu:%d/v_ce'%i, v_ce)
+                            if model_type != 2:
+                                tf.summary.scalar('/gpu:%d/ce'%i,ce)
                             tf.summary.scalar('/gpu:%d/reg'%i,reg)
                             tf.summary.scalar('/gpu:%d/loss'%i,loss)
-                            tf.summary.scalar('/gpu:%d/kl'%i,kl)
+                            if model_type != 2:
+                                tf.summary.scalar('/gpu:%d/kl'%i,kl)
 
-                self.prob = tf.reshape(tower_prob, [batch_size, board_size * board_size])
+                if model_type != 2:
+                    self.prob = tf.reshape(tower_prob, [batch_size, board_size * board_size])
+                if model_type != 1:
+                    self.v_prob = tf.reshape(tower_v_prob, [batch_size, board_size])
                 grads = self._average_gradients(tower_grads)
                 apply_gradient_op = optimizer.apply_gradients(grads, global_step=self.global_step)
                 self.train_step = apply_gradient_op
                 self.loss = tf.reduce_mean(tower_loss)
-                self.ce   = tf.reduce_mean(tower_ce)
-                self.mse  = tf.reduce_mean(tower_mse)
+                if model_type != 2:
+                    self.ce   = tf.reduce_mean(tower_ce)
+                #self.mse  = tf.reduce_mean(tower_mse)
+                if model_type != 1:
+                    self.v_ce = tf.reduce_mean(tower_v_ce)
                 self.reg  = tf.reduce_mean(reg)
                 #self.acc = tf.metrics.accuracy(labels=tf.argmax(self.nxt_move), predictions=tf.argmax(self.prob))
 
@@ -281,17 +343,35 @@ class model(model_base):
         else:
             self.sess.run([self.feed_step], feed_dict=feed)
     # For supervised training
-    def sl_train(self, summary_writer, features, labels, print_step=100):
+    def sl_train(self, summary_writer, features, labels, values, model_type, print_step=100):
         start_time = time.time()
-        feed_dict = {self.features: features, self.nxt_move: labels}
+        if model_type == 1:
+            feed_dict = {self.features: features, self.nxt_move: labels}
+        elif model_type == 2:
+            feed_dict = {self.features: features, self.nxt_value: values}
+        else:
+            feed_dict = {self.features: features, self.nxt_move: labels, self.nxt_value: values}
+            
         for _ in range(print_step - 1):
             self.sess.run(self.train_step, feed_dict=feed_dict)
-        _, loss, ce, mse, reg, prob, summary = self.sess.run([self.train_step, self.loss, self.ce, self.mse, self.reg, self.prob, self.summary_step], feed_dict=feed_dict)
-        acc = accuracy_score(np.argmax(labels, 1), np.argmax(prob, 1))
-        if self.overall_acc == -1.0:
-            self.overall_acc = acc
+        if model_type == 1:
+            _, loss, ce, reg, prob, summary = self.sess.run([self.train_step, self.loss, self.ce, self.reg, self.prob, self.summary_step], feed_dict=feed_dict)
+        elif model_type == 2:
+            _, loss, v_ce, reg, v_prob, summary = self.sess.run([self.train_step, self.loss, self.v_ce, self.reg, self.v_prob, self.summary_step], feed_dict=feed_dict)
         else:
-            self.overall_acc = 0.999 * self.overall_acc + 0.001 * acc
+            _, loss, ce, v_ce, reg, prob, v_prob, summary = self.sess.run([self.train_step, self.loss, self.ce, self.v_ce, self.reg, self.prob, self.v_prob, self.summary_step], feed_dict=feed_dict)
+        if model_type != 2:
+            acc = accuracy_score(np.argmax(labels, 1), np.argmax(prob, 1))
+            if self.overall_acc == -1.0:
+                self.overall_acc = acc
+            else:
+                self.overall_acc = 0.999 * self.overall_acc + 0.001 * acc
+        if model_type != 1:
+            v_acc = accuracy_score(np.argmax(values, 1), np.argmax(v_prob, 1))
+            if self.overall_v_acc == -1.0:
+                self.overall_v_acc = v_acc
+            else:
+                self.overall_v_acc = 0.999 * self.overall_v_acc + 0.001 * v_acc
         global_step = self.sess.run(self.global_step)
         summary_writer.add_summary(summary, global_step)
 
@@ -299,8 +379,20 @@ class model(model_base):
         num_sample_per_step = self.batch_size
         sample_per_sec = num_sample_per_step  * print_step / duration
         sec_per_batch = duration / print_step
-        format_str = ("global step %d loss %.3f; ce %.3f; mse %.3f; reg %.3f acc %.3f total_acc %.3f; %.1f samples/sec; %.3f sec/batch")
-        print (format_str % (global_step, loss, ce, mse, reg, acc, self.overall_acc, sample_per_sec, sec_per_batch))
+        if model_type == 1:
+            format_str = ("global step %d loss %.3f; ce %.3f; reg %.3f acc %.3f total_acc %.3f; %.1f samples/sec; %.3f sec/batch")
+        elif model_type == 2:
+            format_str = ("global step %d loss %.3f; v_ce %.3f; reg %.3f v_acc %.3f v_total_acc %.3f; %.1f samples/sec; %.3f sec/batch")
+        else:
+            format_str = ("global step %d loss %.3f; ce %.3f; v_ce %.3f; reg %.3f acc %.3f total_acc %.3f; v_acc %.3f total_v_acc %.3f; %.1f samples/sec; %.3f sec/batch")
+        if model_type == 1:
+            print (format_str % (global_step, loss, ce, reg, acc, self.overall_acc, sample_per_sec, sec_per_batch))
+        elif model_type == 2:
+            print (format_str % (global_step, loss, v_ce, reg, v_acc, self.overall_v_acc, sample_per_sec, sec_per_batch))
+        else:
+            print (format_str % (global_step, loss, ce, v_ce, reg, acc, self.overall_acc, v_acc, self.overall_v_acc, sample_per_sec, sec_per_batch))
+
+
         sys.stdout.flush()
 
 

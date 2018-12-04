@@ -8,5 +8,5 @@
 #SBATCH -p aida --gres=gpu:4 -c 24  # Which queue to run on, and what resources to use
 
 
-python3 -u sudoku_sl.py --log policy --type sudoku_model --model_path ./modelsave_policy --gpu_list 0,1,2,3 --train_gpu 0,1,2,3 | tee master_policy.log
+python3 -u sudoku_sl.py --log policy --type sudoku_model --model_type 1 --model_path ./modelsave_policy --gpu_list 0,1,2,3 --train_gpu 0,1,2,3 | tee master_policy.log
 

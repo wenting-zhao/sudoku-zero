@@ -2,7 +2,7 @@ from os import listdir
 import numpy as np
 import pickle
 
-data_dir = "./sudoku_data"
+data_dir = "./new_sudoku_data"
 
 def _extract_feature(history, pos):
         n_board = history.shape[0]
@@ -22,27 +22,35 @@ if __name__ == "__main__":
     X = []
     Y = []
     value = []
+    miao = 0
     for item in f:
-        if item[0] == 'd' and item[1] == 'a':
+        if item[0] == 'n' and item[1] == 'e':
             with open(data_dir + "/" + item, "rb") as handle:
                 print (item)
                 sudoku_data = pickle.load(handle)
                 tmp_Y = []
                 for ii, one in enumerate(sudoku_data):
-                    for (history, pos, nxt_move) in one[0]:
-                        value.append(#TODO:)
-                        #feature = _extract_feature(history, [x[0] for x in pos])
-                        #label = np.zeros(16 * 16)
-                        #label[int(nxt_move[0] * 16 + nxt_move[1])] = 1.0
-                        #X.append(feature)
-                        #Y.append(label)
+                    for (history, pos, (nxt_move, nxt_value)) in one[0]:
+                        #value.append(#TODO:)
+                        if type(nxt_move) == int:
+                            continue
+                        feature = _extract_feature(history, [x[0] for x in pos])
+                        label = np.zeros(16 * 16)
+                        label[int(nxt_move[0] * 16 + nxt_move[1])] = 1.0
+                        X.append(feature)
+                        value_label = np.zeros(16)
+                        label[int(nxt_value)] = 1.0
+                        Y.append(label)
+                        value.append(value_label)
                         #tmp_Y.append(label)
         cnt += 1
-    #print (np.array(X).shape)
-    #print (np.array(Y).shape)
+        break
+    print (np.array(X).shape)
+    print (np.array(Y).shape)
     print (np.array(value).shape)
+    #print (np.array(X).shape)
     #print (np.argmax(np.array(Y)[-3:-1], 1).shape)
-    #np.save("sudoku_sl_data", np.array(X))
-    #np.save("sudoku_sl_label", np.array(Y))
-    np.save("sudoku_sl_value", np.array(value))
+    np.save("new_sudoku_sl_data_test", np.array(X))
+    np.save("new_sudoku_sl_label_test", np.array(Y))
+    np.save("new_sudoku_sl_value_test", np.array(value))
     print (cnt)

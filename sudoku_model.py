@@ -12,7 +12,7 @@ class sudoku_model(model):
         super().__init__(args, mode, gpu_list)
         self.args = args
 
-    def _forward(self, inputs, batch_size, is_train, dev, reuse, regularizer=None, rot_var=None):
+    def _forward(self, inputs, batch_size, is_train, dev, reuse, regularizer=None, rot_var=None, model_type=1):
         X = inputs
         n_filter = 16
         n_extra = 8
@@ -36,13 +36,25 @@ class sudoku_model(model):
         #value = tf.squeeze(value, axis=1)
 
         # Policy
-        policy = tf_utils.conv_bn_relu(net, 2, 1, scope="policy0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
-        policy = tf.contrib.layers.flatten(policy)
-        logit = tf.contrib.layers.fully_connected(policy, self.args.board_size * self.args.board_size, scope="policy1", activation_fn=None, reuse=reuse, weights_regularizer=regularizer)
-        pred = tf.nn.softmax(logit)
+        if model_type == 1 or model_type == 3:
+            policy = tf_utils.conv_bn_relu(net, 2, 1, scope="policy0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
+            policy = tf.contrib.layers.flatten(policy)
+            logit = tf.contrib.layers.fully_connected(policy, self.args.board_size * self.args.board_size, scope="policy1", activation_fn=None, reuse=reuse, weights_regularizer=regularizer)
+            pred = tf.nn.softmax(logit)
+        if model_type == 2 or model_type == 3:
+            value = tf_utils.conv_bn_relu(net, 2, 1, scope="value0", dev=dev, is_train=is_train, reuse=reuse, weights_regularizer=regularizer)
+            value = tf.contrib.layers.flatten(value)
+            v_logit = tf.contrib.layers.fully_connected(value, self.args.board_size, scope="value1", activation_fn=None, reuse=reuse, weights_regularizer=regularizer)
+            v_pred = tf.nn.softmax(v_logit)
 
-        #value = tf.identity(value, "value_output")
-        pred = tf.identity(pred, "policy_output")
-        
-        return logit, pred
+        if model_type != 1:
+            v_pred = tf.identity(v_pred, "value_output")
+        if model_type != 2:
+            pred = tf.identity(pred, "policy_output")
+        if model_type == 1: 
+            return logit, pred
+        elif model_type == 2:
+            return v_logit, v_pred
+        else:
+            return logit, pred, v_logit, v_pred
         #return logit, pred, value

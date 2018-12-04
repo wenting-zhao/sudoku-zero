@@ -16,18 +16,18 @@ def train():
     train_agent.sl_build_model(args.model_type)
     train_agent.load_model()
 
-    summary_writter = tf.summary.FileWriter("%s-sudoku-zero-sl.log" % args.log, train_agent.sess.graph)    
+    summary_writter = tf.summary.FileWriter("%s-modeltype_%d-sl.log" % args.log, args.model_type, train_agent.sess.graph)    
     start_time = time.time()
-    train_data = np.load("sudoku_sl_data.npy")
-    train_label = np.load("sudoku_sl_label.npy")
+    train_data = np.load("new_sudoku_sl_data.npy")
+    train_label = np.load("new_sudoku_sl_label.npy")
     train_value = None
     if args.model_type != 1:
-        train_value = np.load("sudoku_sl_value.npy")
+        train_value = np.load("new_sudoku_sl_value.npy")
     shuffle_index = np.arange(train_data.shape[0])
     np.random.shuffle(shuffle_index)
     train_data = train_data[shuffle_index]
     train_label = train_label[shuffle_index]
-    if train_value != None:
+    if args.model_type != 1:
         train_value = train_value[shuffle_index]
     num_data = train_data.shape[0]
     print ("Total training data number: %d" % num_data)
@@ -41,14 +41,15 @@ def train():
             ed = (i + 1) * args.batch_size
             X = train_data[st:ed]
             label = train_label[st:ed]
-            if train_value != None:
+            if args.model_type != 1:
                 value = train_value[st:ed]
             global_step = train_agent.get_step()
-            train_agent.sl_train(summary_writter, features=np.array(X), labels=np.array(label), values=np.array(train_value), print_step=10)
+            train_agent.sl_train(summary_writter, features=np.array(X), labels=np.array(label), values=np.array(value), model_type=args.model_type, print_step=10)
 
             if global_step % args.save_every == 0 and global_step > 0:
                 train_agent.saver.save(train_agent.sess, os.path.join(args.model_path, "model.ckpt"), global_step=global_step)
 
+    global_step = train_agent.get_step()
     train_agent.saver.save(train_agent.sess, os.path.join(args.model_path, "model.ckpt"), global_step=global_step)
 
 if __name__ == "__main__":
