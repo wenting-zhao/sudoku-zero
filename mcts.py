@@ -83,7 +83,7 @@ class MCTS():
         for (pos, action) in ancestors:
             search_order = sorted(cell_possible_actions.items(), key=lambda kv: len(kv[1]))
             all_minimum = self._get_all_minimum(search_order)
-            search_info.append((copy.deepcopy(running_sudoku), copy.deepcopy(all_minimum), pos))
+            search_info.append((copy.deepcopy(running_sudoku), copy.deepcopy(all_minimum), (pos, action)))
             running_sudoku[pos] = action
             for i in range(self.sudoku_size):
                 if (i, pos[1]) in cell_possible_actions:
