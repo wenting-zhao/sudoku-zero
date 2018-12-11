@@ -66,6 +66,7 @@ def main():
     train_agent.load_model()
 
     mcts = MCTS(train_agent, sudoku_size=16, infer=True, rollout=100, ucb1_confidence=0)
+    mcts.set_least_val_first()
     res = mcts(sudoku, n=100000)
 
 
@@ -81,6 +82,7 @@ if __name__ == '__main__':
 
     argparser.add_argument("--port", type=int, default="12345")
     argparser.add_argument("--host", type=str, default="localhost")
+    argparser.add_argument("--log", type=str, default="default_log")
 
     argparser.add_argument("--num_thread", type=int, default=1)
     argparser.add_argument("--eval_batch_size", type=int, default=16)
@@ -94,6 +96,8 @@ if __name__ == '__main__':
     argparser.add_argument("--regularizer", type=bool, default=True)
     argparser.add_argument("--board_size", type=int, default=16)
     argparser.add_argument("--save_every", type=int, default=1000)
+    # 1: Policy 2: Value 3: P+V
+    argparser.add_argument("--model_type", type=int, default=1)
 
     args = argparser.parse_args()
 
