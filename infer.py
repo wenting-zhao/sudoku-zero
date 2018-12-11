@@ -61,8 +61,8 @@ def whether_remove(prob):
 def main():
     module = importlib.import_module(args.type)
     train_agent = module.sudoku_model(args, mode="predict", gpu_list=args.train_gpu)
-    train_agent.sl_preprocess()
-    train_agent.sl_build_model()
+    train_agent.sl_preprocess(args.model_type)
+    train_agent.sl_build_model(args.model_type)
     train_agent.load_model()
 
     mcts = MCTS(train_agent, sudoku_size=16, infer=True, rollout=100, ucb1_confidence=0)
