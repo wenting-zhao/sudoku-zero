@@ -15,6 +15,7 @@ class MCTS():
         self.gen_data = gen_data
         self.sudoku_size = sudoku_size
         self.rollout = rollout
+        self.least_val_first = False
         self.max_depth = self.sudoku_size ** 2
         self.box_group, self.which_group = self._get_box_group(self.sudoku_size)
         self.ucb1_confidence = ucb1_confidence
@@ -137,7 +138,7 @@ class MCTS():
         while node.depth < self.max_depth:
             untried_nodes = node.untried_nodes()
             if len(untried_nodes) > 0:
-                untried = random.choice(untried_nodes)
+                untried = self.get_node(untried_nodes)
                 ancestors.append(((untried.pos), untried.action))
                 return untried, ancestors
             else:
@@ -166,7 +167,7 @@ class MCTS():
                     else:
                         pos, possible_values = random.choice(all_minimum)
                     self._create_leaves(node, pos, possible_values)
-        return random.choice(list(node.children)), ancestors
+        return self.get_node(node.children), ancestors
 
     # compute next level that has fewest available actions
     def _update_constraints(self, additional_nodes):
@@ -217,10 +218,24 @@ class MCTS():
             if len(actions) == 0:
                 break
             else:
-                node = Node(node, random.choice(list(actions)), pos)
+                node = Node(node, self.get_action(actions), pos)
                 move_sequence.append((node.pos, node.action))
         assert depth == len(move_sequence)+len(ancestors)+self.root.depth
         return depth, move_sequence
+
+    def get_action(self, actions):
+        if self.least_val_first:
+            action = sorted(actions)[0]
+        else:
+            action = random.choice(list(actions))
+        return action
+
+    def get_node(self, nodes):
+        if self.least_val_first:
+            node = sorted(nodes, key=lambda e: e.action)[0]
+        else:
+            node = random.choice(list(nodes))
+        return node
 
     def new_state(self, ancestors):
         new = copy.deepcopy(self.sudoku)
@@ -314,6 +329,9 @@ class MCTS():
         for pseudo_node in additional_nodes:
             new_explored[pseudo_node[0]] = 1
         return new_explored
+
+    def set_least_val_first(self):
+        self.least_val_first = True
 
 
 class Node():
