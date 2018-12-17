@@ -18,11 +18,11 @@ def train():
 
     summary_writter = tf.summary.FileWriter("%s-modeltype_%d-sl.log" % (args.log, args.model_type), train_agent.sess.graph)    
     start_time = time.time()
-    train_data = np.load("new_sudoku_sl_data.npy")
-    train_label = np.load("new_sudoku_sl_label.npy")
+    train_data = np.load("final_sudoku_sl_data_train.npy")
+    train_label = np.load("final_sudoku_sl_label.npy")
     train_value = None
     if args.model_type != 1:
-        train_value = np.load("new_sudoku_sl_value.npy")
+        train_value = np.load("final_sudoku_sl_value.npy")
     shuffle_index = np.arange(train_data.shape[0])
     np.random.shuffle(shuffle_index)
     train_data = train_data[shuffle_index]
@@ -44,7 +44,7 @@ def train():
             if args.model_type != 1:
                 value = train_value[st:ed]
             global_step = train_agent.get_step()
-            if model_type != 1:
+            if args.model_type != 1:
                 train_agent.sl_train(summary_writter, features=np.array(X), labels=np.array(label), values=np.array(value), model_type=args.model_type, print_step=10)
             else:
                 train_agent.sl_train(summary_writter, features=np.array(X), labels=np.array(label), values=None, model_type=args.model_type, print_step=10)

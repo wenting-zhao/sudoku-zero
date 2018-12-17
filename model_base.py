@@ -54,9 +54,16 @@ class model_base(object):
         self.saver.save(self.sess, os.path.join(path, 'model.ckpt'), global_step=self.global_step)
 
     # Raise ValueError if incorrect path provided
-    def load_model(self, path=None):
+    def load_model(self, index=None, path=None):
         if path is None:
             path = self.model_path
+        if index is not None:
+            #path = os.path.join(path, 'model.ckpt-%s.data-00000-00001' % (index))
+            path = os.path.join(path, 'model.ckpt-%s' % (index))
+            print (path)
+            self.saver.restore(self.sess, path)
+            return True
+
         ckpt = tf.train.get_checkpoint_state(path)
         if ckpt and ckpt.model_checkpoint_path:
             if ckpt.model_checkpoint_path == self.cur_checkpoint:

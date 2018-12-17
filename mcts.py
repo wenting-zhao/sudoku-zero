@@ -36,11 +36,16 @@ class MCTS():
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
         all_minimum = self._get_all_minimum(self.search_order)
+        print ("mmm: ", len(all_minimum))
         if self.infer:
             features = np.zeros((1, 16, 16, 18))
             features[0] = self.model._extract_feature(self.sudoku, [x[0] for x in all_minimum])
-            max_prob = np.argmax(self.model.predict(features))
+            prob_distribution = self.model.predict(features)
+            #max_prob = np.argmax(self.model.predict(features))
+            max_prob = np.argmax(prob_distribution)
+            print (prob_distribution)
             pos = divmod(max_prob, 16)
+            possible_values = None
             for elm in all_minimum:
                 if elm[0] == pos:
                     possible_values = elm[1]
@@ -155,10 +160,14 @@ class MCTS():
                         return None, ancestors
                     search_order = self._get_search_order(new_constraints, explored)
                     all_minimum = self._get_all_minimum(search_order)
+                    print ("mmm: ", len(all_minimum))
                     if self.infer:
                         features = np.zeros((1, 16, 16, 18))
                         features[0] = self.model._extract_feature(self.new_state(ancestors), [x[0] for x in all_minimum])
-                        max_prob = np.argmax(self.model.predict(features))
+                        prob_distribution = self.model.predict(features)
+                        #max_prob = np.argmax(self.model.predict(features))
+                        max_prob = np.argmax(prob_distribution)
+                        print (prob_distribution)
                         pos = divmod(max_prob, 16)
                         for elm in all_minimum:
                             if elm[0] == pos:

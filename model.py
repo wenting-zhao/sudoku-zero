@@ -69,7 +69,6 @@ class model(model_base):
     def _extract_feature(self, history, pos):
         n_board = history.shape[0]
         ret = np.zeros((n_board, n_board, n_board + 2))
-        print (ret.shape)
         for (x, y) in zip(range(n_board), range(n_board)):
             ret[x, y, int(history[x, y])] = 1.0
         for (x, y) in pos:
@@ -107,12 +106,13 @@ class model(model_base):
                         logit, v_logit, v_logit, v_prob = self._forward(self.X, batch_size, False, dev='tower0', reuse=None, model_type=model_type)
                     if model_type != 2:
                         self.prob = tf.identity(prob, "policy_output")
+                        self.logit = tf.identity(logit, "policy_logit")
                     if model_type != 1:
                         self.value = tf.identity(value, "value_output")
                     #self.value = tf.identity(value, "value_output")
             else:
                 #TODO:
-                lr = tf.train.piecewise_constant(self.global_step, [500000, 1000000], [0.0005, 0.0001, 0.00001])
+                lr = tf.train.piecewise_constant(self.global_step, [500000, 1000000], [0.0001, 0.00005, 0.00001])
                 #lr = self.args.lr
 
                 optimizer = tf.train.MomentumOptimizer(learning_rate=lr, momentum=0.9)

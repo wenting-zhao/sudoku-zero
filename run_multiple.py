@@ -47,6 +47,7 @@ def parse_args():
     parser.add_argument("--save_every", type=int, default=1000)
     # 1: Policy 2: Value 3: P+V
     parser.add_argument("--model_type", type=int, default=1)
+    parser.add_argument("--model_index", type=str, default=None)
     args = parser.parse_args()
 
     return args
@@ -90,12 +91,13 @@ def main():
     train_agent = module.sudoku_model(args, mode="predict", gpu_list=args.train_gpu)
     train_agent.sl_preprocess(args.model_type)
     train_agent.sl_build_model(args.model_type)
-    train_agent.load_model()
+    train_agent.load_model(index=args.model_index)
 
     for i in range(args.instances):
         stats = utils.Statistics()
         all_sudoku = np.load("datasets/train_16.npy")
-        sudoku = all_sudoku[random.randrange(10000)]
+        #sudoku = all_sudoku[random.randrange(10000)]
+        sudoku = all_sudoku[0]
         update_sudoku(sudoku)
         n = len(sudoku)
 
