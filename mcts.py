@@ -9,7 +9,7 @@ class MCTS():
     tree policy, a default policy, and a backup strategy.
     See e.g. Browne et al. (2012) for a survey on monte carlo tree search
     """
-    def __init__(self, model, sudoku_size, gen_data=False, infer=False, rollout=10, ucb1_confidence=1.41, softmax=False):
+    def __init__(self, model, sudoku_size, gen_data=False, infer=False, rollout=10, ucb1_confidence=1.41, softmax=False, use_value_network=0, value_model=None):
         self.model = model
         self.infer = infer
         self.gen_data = gen_data
@@ -24,6 +24,9 @@ class MCTS():
         self.sample = 0
         # Use softmax in dlmcts to generate action
         self.softmax = softmax
+        self.use_value_network = use_value_network
+        if self.use_value_network:
+            self.value_model = value_model
 
     def _softmax(self, x):
         return np.exp(x) / (np.sum(np.exp(x), axis=0))
@@ -218,6 +221,7 @@ class MCTS():
                         else:
                             pos = divmod(max_prob, 16)
                         #pos = divmod(max_prob, 16)
+                        possible_values = None
                         for elm in all_minimum:
                             if elm[0] == pos:
                                 possible_values = elm[1]
@@ -308,6 +312,10 @@ class MCTS():
             (x, y), action = move[:2]
             new[x, y] = action
         return new
+
+    def UCB_with_network(self, node):
+        ret = node.score +  
+        return ret
 
     def compute_tree_policy(self, node):
         res = (node.score + self.ucb1_confidence * np.sqrt(2 * np.log(node.parent.visited) / node.visited))

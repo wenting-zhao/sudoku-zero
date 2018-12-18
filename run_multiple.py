@@ -48,6 +48,7 @@ def parse_args():
     # 1: Policy 2: Value 3: P+V
     parser.add_argument("--model_type", type=int, default=1)
     parser.add_argument("--model_index", type=str, default=None)
+    parser.add_argument("--use_value_network", type=int, default=0)
     args = parser.parse_args()
 
     return args
@@ -112,7 +113,7 @@ def main():
                     stats.add_stat('mcts_counter', 999999)
                 mcts.reset_sample()
 
-        dlmcts = MCTS(train_agent, sudoku_size=16, infer=True, rollout=100, ucb1_confidence=0, softmax=True)
+        dlmcts = MCTS(train_agent, sudoku_size=16, infer=True, rollout=100, ucb1_confidence=0, softmax=True, use_value_network=args.use_value_network)
         dlmcts.set_least_val_first(rollout=args.rollout, next_node=args.next_node)
         for _ in range(args.number):
             with stats.time('dlmcts'):

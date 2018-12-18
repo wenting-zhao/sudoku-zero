@@ -31,7 +31,7 @@ def train():
         train_value = train_value[shuffle_index]
     num_data = train_data.shape[0]
     print ("Total training data number: %d" % num_data)
-    for iteration in range(10):
+    for iteration in range(3):
         print ("Training on iteration: %d" % (iteration))
         for i in range(int(num_data // args.batch_size)):
             if (i + 1) * args.batch_size > num_data:
@@ -80,7 +80,7 @@ if __name__ == "__main__":
     argparser.add_argument("--filename", type=str, default=None)
     argparser.add_argument("--regularizer", type=bool, default=True)
     argparser.add_argument("--board_size", type=int, default=16)
-    argparser.add_argument("--save_every", type=int, default=1000)
+    argparser.add_argument("--save_every", type=int, default=500000)
     # 1: Policy 2: Value 3: P+V
     argparser.add_argument("--model_type", type=int, default=1)
 

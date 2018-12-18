@@ -215,7 +215,7 @@ class model(model_base):
 
             init = tf.global_variables_initializer()
             self.sess.run(init)
-            self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=50)
+            self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=200)
             self.all_var = tf.global_variables()
 
 
@@ -331,7 +331,7 @@ class model(model_base):
 
             init = tf.global_variables_initializer()
             self.sess.run(init)
-            self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=50)
+            self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=200)
             self.all_var = tf.global_variables()
 
     def push_sample(self, features, nxt_move, label, pos, get_cur_size=False):
