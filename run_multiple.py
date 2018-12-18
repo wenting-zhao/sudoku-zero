@@ -112,7 +112,7 @@ def main():
                     stats.add_stat('mcts_counter', 999999)
                 mcts.reset_sample()
 
-        dlmcts = MCTS(train_agent, sudoku_size=16, infer=True, rollout=100, ucb1_confidence=0)
+        dlmcts = MCTS(train_agent, sudoku_size=16, infer=True, rollout=100, ucb1_confidence=0, softmax=True)
         dlmcts.set_least_val_first(rollout=args.rollout, next_node=args.next_node)
         for _ in range(args.number):
             with stats.time('dlmcts'):

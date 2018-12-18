@@ -9,7 +9,7 @@ class MCTS():
     tree policy, a default policy, and a backup strategy.
     See e.g. Browne et al. (2012) for a survey on monte carlo tree search
     """
-    def __init__(self, model, sudoku_size, gen_data=False, infer=False, rollout=10, ucb1_confidence=1.41):
+    def __init__(self, model, sudoku_size, gen_data=False, infer=False, rollout=10, ucb1_confidence=1.41, softmax=False):
         self.model = model
         self.infer = infer
         self.gen_data = gen_data
@@ -22,6 +22,11 @@ class MCTS():
         self.ucb1_confidence = ucb1_confidence
         self.root = Node(parent=None, action=None, pos="root")
         self.sample = 0
+        # Use softmax in dlmcts to generate action
+        self.softmax = softmax
+
+    def _softmax(self, x):
+        return np.exp(x) / (np.sum(np.exp(x), axis=0))
 
     def __call__(self, sudoku_state, n=10000):
         """
@@ -36,21 +41,46 @@ class MCTS():
         # self.search_order : [((pos-x, pos-y), [move1, move2, ...]), ...]
         self.search_order = self._get_search_order(self.constraints, self.explored_nodes)
         all_minimum = self._get_all_minimum(self.search_order)
-        print ("mmm: ", len(all_minimum))
+        num_possible_action = len(all_minimum)
+        #print ("mmm: ", len(all_minimum))
         if self.infer:
             features = np.zeros((1, 16, 16, 18))
             features[0] = self.model._extract_feature(self.sudoku, [x[0] for x in all_minimum])
             prob_distribution = self.model.predict(features)
-            #max_prob = np.argmax(self.model.predict(features))
             max_prob = np.argmax(prob_distribution)
-            print (prob_distribution)
-            pos = divmod(max_prob, 16)
+            #max_prob = np.argmax(self.model.predict(features))
+            prob_distribution = prob_distribution[0]
+            if self.softmax:
+                tmp = []
+                prob_distribution = prob_distribution.reshape(16, 16)
+                print (prob_distribution.shape)
+                xx, yy = prob_distribution.shape
+                for ii in range(xx):
+                    for jj in range(yy):
+                        tmp.append((prob_distribution[ii, jj], (ii, jj)))
+                tmp.sort(reverse=True, key=lambda x: x[0])
+                pos_candidate = []
+                for ii in range(num_possible_action):
+                    pos_candidate.append(tmp[ii][0])
+                print (pos_candidate)
+                softmax_pos = self._softmax(np.array(pos_candidate))
+                pos_index = np.random.choice(np.arange(num_possible_action), p=softmax_pos)
+                pos = tmp[pos_index][1]
+                print (pos)
+            else:
+                pos = divmod(max_prob, 16)
             possible_values = None
             for elm in all_minimum:
                 if elm[0] == pos:
                     possible_values = elm[1]
                     break
-            assert possible_values is not None
+            if possible_values is None:
+                pos, possible_values = random.choice(all_minimum)
+                print ("Assert: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                print (num_possible_action)
+                print (prob_distribution)
+                print (self._softmax(pos_candidate))
+            #assert possible_values is not None
         else:
             pos, possible_values = random.choice(all_minimum)
         self.root.depth = np.count_nonzero(self.explored_nodes) - 1
@@ -160,20 +190,45 @@ class MCTS():
                         return None, ancestors
                     search_order = self._get_search_order(new_constraints, explored)
                     all_minimum = self._get_all_minimum(search_order)
-                    print ("mmm: ", len(all_minimum))
+                    num_possible_action = len(all_minimum)
+                    #print ("mmm: ", len(all_minimum))
                     if self.infer:
                         features = np.zeros((1, 16, 16, 18))
                         features[0] = self.model._extract_feature(self.new_state(ancestors), [x[0] for x in all_minimum])
                         prob_distribution = self.model.predict(features)
-                        #max_prob = np.argmax(self.model.predict(features))
                         max_prob = np.argmax(prob_distribution)
-                        print (prob_distribution)
-                        pos = divmod(max_prob, 16)
+                        #max_prob = np.argmax(self.model.predict(features))
+                        prob_distribution = prob_distribution[0]
+                        if self.softmax:
+                            tmp = []
+                            prob_distribution = prob_distribution.reshape(16, 16)
+                            xx, yy = 16, 16
+                            for ii in range(xx):
+                                for jj in range(yy):
+                                    tmp.append((prob_distribution[ii, jj], (ii, jj)))
+                            tmp.sort(reverse=True, key=lambda x: x[0])
+                            pos_candidate = []
+                            for ii in range(num_possible_action):
+                                pos_candidate.append(tmp[ii][0])
+                            print (pos_candidate)
+                            softmax_pos = self._softmax(np.array(pos_candidate))
+                            pos_index = np.random.choice(np.arange(num_possible_action), p=softmax_pos)
+                            pos = tmp[pos_index][1]
+                            print (pos)
+                        else:
+                            pos = divmod(max_prob, 16)
+                        #pos = divmod(max_prob, 16)
                         for elm in all_minimum:
                             if elm[0] == pos:
                                 possible_values = elm[1]
                                 break
-                        assert possible_values is not None
+                        if possible_values is None:
+                            pos, possible_values = random.choice(all_minimum)
+                            print ("Assert: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                            print (num_possible_action)
+                            print (prob_distribution)
+                            print (self._softmax(pos_candidate))
+                        #assert possible_values is not None
                     else:
                         pos, possible_values = random.choice(all_minimum)
                     self._create_leaves(node, pos, possible_values)
