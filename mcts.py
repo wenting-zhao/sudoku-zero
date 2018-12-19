@@ -299,6 +299,8 @@ class MCTS():
             features = self.model._extract_feature4value(self.new_state(ancestors), [x[0] for x in all_minimum])
             prob_distribution = self.model.predict(features)
             action = np.argmax(prob_distribution)
+            for node in nodes:
+                node.prob = prob_distribution[node.action-1]
         else:
             action = random.choice(list(actions))
         return action
@@ -310,6 +312,8 @@ class MCTS():
             features = self.model._extract_feature4value(self.new_state(ancestors), [x[0] for x in all_minimum])
             prob_distribution = self.model.predict(features)
             action = np.argmax(prob_distribution)
+            for node in nodes:
+                node.prob = prob_distribution[node.action-1]
         else:
             node = random.choice(list(nodes))
         return node
