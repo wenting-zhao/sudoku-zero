@@ -77,6 +77,15 @@ class model(model_base):
             ret[x, y, n_board + 1] = 1.0
         return ret
 
+    def _extract_feature4value(self, history, pos):
+        n_board = history.shape[0]
+        ret = np.zeros((n_board, n_board, n_board + 2))
+        for (x, y) in zip(range(n_board), range(n_board)):
+            ret[x, y, int(history[x, y])] = 1.0
+        ret[pos[0], pos[1], n_board + 1] = 1.0
+
+        return ret
+
     # For supervised training
     def sl_preprocess(self, model_type):
         with self.graph.as_default():

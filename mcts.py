@@ -292,16 +292,24 @@ class MCTS():
         assert depth == len(move_sequence)+len(ancestors)+self.root.depth
         return depth, move_sequence
 
-    def get_action(self, actions, heuristic=False):
+    def get_action(self, actions, infer=False, ancesters=None, heuristic=False):
         if heuristic:
             action = sorted(actions)[0]
+        elif infer:
+            features = self.model._extract_feature4value(self.new_state(ancestors), [x[0] for x in all_minimum])
+            prob_distribution = self.model.predict(features)
+            action = np.argmax(prob_distribution)
         else:
             action = random.choice(list(actions))
         return action
 
-    def get_node(self, nodes, heuristic=False):
+    def get_node(self, nodes, infer=False, ancesters=None, heuristic=False):
         if heuristic:
             node = sorted(nodes, key=lambda e: e.action)[0]
+        elif infer:
+            features = self.model._extract_feature4value(self.new_state(ancestors), [x[0] for x in all_minimum])
+            prob_distribution = self.model.predict(features)
+            action = np.argmax(prob_distribution)
         else:
             node = random.choice(list(nodes))
         return node
@@ -314,7 +322,7 @@ class MCTS():
         return new
 
     def UCB_with_network(self, node):
-        ret = node.score +  
+        ret = node.score + self.ucb1_confidence * (node.prob / (1+node.visited))
         return ret
 
     def compute_tree_policy(self, node):
@@ -419,7 +427,7 @@ class Node():
         self.visited = 0
         self.score = 0
         self.reward = 0
-        self.prior = 0
+        self.prob = 0
         self.pos = pos
 
         if self.parent is not None:
