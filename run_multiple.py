@@ -49,6 +49,8 @@ def parse_args():
     parser.add_argument("--model_type", type=int, default=1)
     parser.add_argument("--model_index", type=str, default=None)
     parser.add_argument("--use_value_network", type=int, default=0)
+    parser.add_argument("--dl_ucb", type=int, default=0)
+    parser.add_argument("--mix_policy", type=int, default=0)
     args = parser.parse_args()
 
     return args
@@ -97,8 +99,8 @@ def main():
     for i in range(args.instances):
         stats = utils.Statistics()
         all_sudoku = np.load("datasets/train_16.npy")
-        #sudoku = all_sudoku[random.randrange(10000)]
-        sudoku = all_sudoku[0]
+        sudoku = all_sudoku[random.randrange(10000)]
+        #sudoku = all_sudoku[666]
         update_sudoku(sudoku)
         n = len(sudoku)
 
@@ -113,7 +115,7 @@ def main():
                     stats.add_stat('mcts_counter', 999999)
                 mcts.reset_sample()
 
-        dlmcts = MCTS(train_agent, sudoku_size=16, infer=True, rollout=100, ucb1_confidence=0, softmax=True, use_value_network=args.use_value_network)
+        dlmcts = MCTS(train_agent, sudoku_size=16, infer=True, rollout=100, ucb1_confidence=0, softmax=True, dl_ucb=args.dl_ucb, mix_policy=args.mix_policy, use_value_network=args.use_value_network)
         dlmcts.set_least_val_first(rollout=args.rollout, next_node=args.next_node)
         for _ in range(args.number):
             with stats.time('dlmcts'):

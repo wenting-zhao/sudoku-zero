@@ -9,7 +9,7 @@ class MCTS():
     tree policy, a default policy, and a backup strategy.
     See e.g. Browne et al. (2012) for a survey on monte carlo tree search
     """
-    def __init__(self, model, sudoku_size, gen_data=False, infer=False, rollout=10, ucb1_confidence=1.41, softmax=False, use_value_network=0, value_model=None):
+    def __init__(self, model, sudoku_size, gen_data=False, infer=False, rollout=10, ucb1_confidence=1.41, softmax=False, dl_ucb=None, mix_policy=None, use_value_network=0, value_model=None):
         self.model = model
         self.infer = infer
         self.gen_data = gen_data
@@ -27,6 +27,8 @@ class MCTS():
         self.use_value_network = use_value_network
         if self.use_value_network:
             self.value_model = value_model
+        self.dl_ucb = dl_ucb
+        self.mix_policy = mix_policy
 
     def _softmax(self, x):
         return np.exp(x) / (np.sum(np.exp(x), axis=0))
@@ -62,14 +64,17 @@ class MCTS():
                     for jj in range(yy):
                         tmp.append((prob_distribution[ii, jj], (ii, jj)))
                 tmp.sort(reverse=True, key=lambda x: x[0])
-                pos_candidate = []
-                for ii in range(num_possible_action):
-                    pos_candidate.append(tmp[ii][0])
-                print (pos_candidate)
-                softmax_pos = self._softmax(np.array(pos_candidate))
-                pos_index = np.random.choice(np.arange(num_possible_action), p=softmax_pos)
-                pos = tmp[pos_index][1]
-                print (pos)
+                if (self.mix_policy is not None and tmp[ii][0] - tmp[ii][1] >= 0.1):
+                    pos = divmod(max_prob, 16)
+                else:
+                    pos_candidate = []
+                    for ii in range(num_possible_action):
+                        pos_candidate.append(tmp[ii][0])
+                    print (pos_candidate)
+                    softmax_pos = self._softmax(np.array(pos_candidate))
+                    pos_index = np.random.choice(np.arange(num_possible_action), p=softmax_pos)
+                    pos = tmp[pos_index][1]
+                    print (pos)
             else:
                 pos = divmod(max_prob, 16)
             possible_values = None
@@ -166,7 +171,11 @@ class MCTS():
         x = np.zeros(len(node.children))
         children = list(node.children)
         for i in range(len(children)):
-            x[i] = self.compute_tree_policy(children[i])
+            if self.dl_ucb is not None:
+            #x[i] = self.compute_tree_policy(children[i])
+                x[i] = self.UCB_with_network(children[i])
+            else:
+                x[i] = self.compute_tree_policy(children[i])
         e_x = np.exp(x - np.max(x))
         distribution = e_x / e_x.sum()
         res = np.random.choice(children, 1, p=distribution)
